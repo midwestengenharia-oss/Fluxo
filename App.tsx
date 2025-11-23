@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { LayoutDashboard, CalendarDays, PiggyBank, Menu, Settings as SettingsIcon, Plus, Sparkles, CreditCard, RefreshCcw, X, LogOut, Check, Trash2 } from 'lucide-react';
-import { Transaction, Account, CreditCard as CreditCardType, Recurrence, TransactionType, UserSettings, DEFAULT_CATEGORIES, DEFAULT_HEALTH_LEVELS } from './types';
+import { Transaction, Account, CreditCard as CreditCardType, Recurrence, TransactionType, UserSettings, DEFAULT_CATEGORIES, DEFAULT_HEALTH_LEVELS, HealthLevel } from './types';
 import { calculateTimeline, calculateEconomy, processCreditCardTransaction, generateUUID } from './utils/financeUtils';
 import { supabase } from './utils/supabaseClient';
 import Dashboard from './components/Dashboard';
@@ -91,6 +91,44 @@ const getErrorMessage = (error: any): string => {
     return JSON.stringify(error);
 };
 
+// Converte string numérica em pt-BR/en-US para número ou null se inválido
+const parseLocaleNumber = (value: any): number | null => {
+    if (value === null || value === undefined || value === '') return null;
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (trimmed === '') return null;
+
+        // Formatos com milhar em pt-BR (ex: 10.000,50)
+        const thousandPattern = /^\d{1,3}(\.\d{3})+(,\d+)?$/;
+        if (thousandPattern.test(trimmed)) {
+            const normalized = trimmed.replace(/\./g, '').replace(',', '.');
+            const num = Number(normalized);
+            return Number.isFinite(num) ? num : null;
+        }
+
+        // Fallback: troca vírgula por ponto para aceitar "1000,5"
+        const normalized = trimmed.replace(',', '.');
+        const num = Number(normalized);
+        return Number.isFinite(num) ? num : null;
+    }
+
+    const num = Number(value);
+    return Number.isFinite(num) ? num : null;
+};
+
+// Normaliza healthLevels para garantir que min/max sejam números ou null
+const normalizeHealthLevels = (levels: any[]): HealthLevel[] => {
+    if (!Array.isArray(levels)) return DEFAULT_HEALTH_LEVELS;
+    return levels.map(l => ({
+        id: l.id || 'unknown',
+        label: l.label || 'N/A',
+        color: l.color || 'slate',
+        min: parseLocaleNumber(l.min),
+        max: parseLocaleNumber(l.max),
+    }));
+};
+
 const App: React.FC = () => {
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -167,7 +205,7 @@ const App: React.FC = () => {
 
           if (setRes.data) {
               nextSettings = {
-                  healthLevels: setRes.data.health_levels || DEFAULT_HEALTH_LEVELS,
+                  healthLevels: normalizeHealthLevels(setRes.data.health_levels || DEFAULT_HEALTH_LEVELS),
                   customCategories: setRes.data.custom_categories || DEFAULT_CATEGORIES
               };
           } else {
@@ -175,7 +213,11 @@ const App: React.FC = () => {
               const cached = typeof window !== 'undefined' ? window.localStorage.getItem('fluxo_user_settings') : null;
               if (cached) {
                   try {
-                      nextSettings = JSON.parse(cached);
+                      const parsed = JSON.parse(cached);
+                      nextSettings = {
+                          ...parsed,
+                          healthLevels: normalizeHealthLevels(parsed.healthLevels || DEFAULT_HEALTH_LEVELS)
+                      };
                   } catch (_e) { /* ignore parse error */ }
               }
 
@@ -192,10 +234,10 @@ const App: React.FC = () => {
                       .maybeSingle();
 
                   nextSettings = inserted.data ? {
-                      healthLevels: inserted.data.health_levels || DEFAULT_HEALTH_LEVELS,
+                      healthLevels: normalizeHealthLevels(inserted.data.health_levels || DEFAULT_HEALTH_LEVELS),
                       customCategories: inserted.data.custom_categories || DEFAULT_CATEGORIES
                   } : {
-                      healthLevels: DEFAULT_HEALTH_LEVELS,
+                      healthLevels: normalizeHealthLevels(DEFAULT_HEALTH_LEVELS),
                       customCategories: DEFAULT_CATEGORIES
                   };
               }
@@ -231,9 +273,9 @@ const App: React.FC = () => {
           }, { onConflict: 'user_id' }).select().maybeSingle();
           if (error) throw error;
           const nextSettings = data ? {
-              healthLevels: data.health_levels || DEFAULT_HEALTH_LEVELS,
+              healthLevels: normalizeHealthLevels(data.health_levels || DEFAULT_HEALTH_LEVELS),
               customCategories: data.custom_categories || DEFAULT_CATEGORIES
-          } : newSettings;
+          } : { ...newSettings, healthLevels: normalizeHealthLevels(newSettings.healthLevels) };
           setSettings(nextSettings);
           if (typeof window !== 'undefined') {
               window.localStorage.setItem('fluxo_user_settings', JSON.stringify(nextSettings));
@@ -809,6 +851,7 @@ const App: React.FC = () => {
                 timeline={timeline}
                 creditCards={creditCards}
                 accounts={accounts}
+                healthLevels={settings.healthLevels}
                 onSelectDay={(date) => { setSelectedDate(date); setTransactionToEdit(undefined); setIsModalOpen(true); }}
                 onEditTransaction={(t) => { setTransactionToEdit(t); setIsModalOpen(true); }}
                 onViewCard={(cardId) => {

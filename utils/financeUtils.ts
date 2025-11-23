@@ -102,11 +102,31 @@ export const processCreditCardTransaction = (
 
 // Helper to determine health color
 const getHealthColor = (balance: number, levels: HealthLevel[]): string => {
-    const match = levels.find(l => {
-        const min = l.min === null ? -Infinity : l.min;
-        const max = l.max === null ? Infinity : l.max;
-        return balance >= min && balance < max;
+    const normalizeBoundary = (value: any, fallback: number) => {
+        if (value === null || value === undefined || value === '') return fallback;
+        const num = Number(value);
+        return Number.isFinite(num) ? num : fallback;
+    };
+
+    const balanceNum = Number(balance);
+    if (!Number.isFinite(balanceNum)) {
+        return 'slate';
+    }
+
+    const normalized = levels.map(l => ({
+        ...l,
+        min: normalizeBoundary(l.min, -Infinity),
+        max: normalizeBoundary(l.max, Infinity),
+    }));
+
+    const sorted = normalized.sort((a, b) => {
+        if (a.min === b.min) {
+            return (a.max ?? Infinity) - (b.max ?? Infinity);
+        }
+        return a.min - b.min;
     });
+
+    const match = sorted.find(l => balanceNum >= l.min && balanceNum < l.max);
     return match ? match.color : 'slate';
 };
 
