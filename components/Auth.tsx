@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../utils/supabaseClient';
-import { Sparkles, Mail, Lock, ArrowRight, AlertCircle, ShieldCheck, Smartphone, BarChart3 } from 'lucide-react';
+import { Sparkles, Mail, Lock, ArrowRight, AlertCircle } from 'lucide-react';
 import Button from './ui/Button';
 import Card from './ui/Card';
 
@@ -37,40 +37,7 @@ const Auth = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white flex items-center justify-center p-4">
-      <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 gap-6 items-center animate-in fade-in slide-in-from-bottom-4 duration-500">
-        {/* Hero */}
-        <div className="relative overflow-hidden rounded-3xl bg-white/5 border border-white/10 backdrop-blur-2xl p-8 lg:p-10 shadow-[0_40px_120px_-50px_rgba(6,182,212,0.6)]">
-          <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 via-cyan-500/10 to-transparent pointer-events-none" />
-          <div className="relative z-10 space-y-5">
-            <div className="inline-flex items-center gap-3 px-4 py-2 bg-white/10 border border-white/15 rounded-full text-sm font-semibold">
-              <Sparkles size={18} className="text-emerald-300" />
-              Fluxo — nova identidade
-            </div>
-            <div>
-              <h1 className="text-4xl lg:text-5xl font-bold leading-tight font-['Space_Grotesk']">
-                Controle financeiro com cara de 2025.
-              </h1>
-              <p className="text-slate-200/80 mt-3 text-lg leading-relaxed">
-                Visuais em vidro fosco, cores vivas e insights claros para você decidir rápido e com mais confiança.
-              </p>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {[
-                { icon: <ShieldCheck size={18} />, title: 'Segurança', desc: 'Supabase Auth e criptografia.' },
-                { icon: <BarChart3 size={18} />, title: 'Projeções', desc: 'Cashflow, recorrências e cartões.' },
-                { icon: <Smartphone size={18} />, title: 'Responsivo', desc: 'Pronto para desktop e mobile.' },
-              ].map((item) => (
-                <div key={item.title} className="p-3 rounded-xl bg-white/5 border border-white/10">
-                  <div className="flex items-center gap-2 text-emerald-200 font-semibold text-sm">
-                    {item.icon} {item.title}
-                  </div>
-                  <p className="text-xs text-slate-200/80 mt-1 leading-relaxed">{item.desc}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
+      <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-500">
         {/* Form */}
         <div className="w-full">
           <Card variant="default" padding="lg" className="bg-white/80 backdrop-blur-2xl text-slate-900 shadow-[0_30px_80px_-50px_rgba(15,23,42,0.55)]">
