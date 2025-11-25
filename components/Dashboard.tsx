@@ -1,6 +1,6 @@
-import React from 'react';
-import { TrendingUp, Wallet, ArrowUpRight, ArrowDownRight, Activity, BrainCircuit, Send, AlertTriangle, Clock, Target, Sparkles, Flame, ShieldCheck } from 'lucide-react';
-import { DailyBalance, Account, UserSettings } from '../types';
+import React, { useMemo, useState } from 'react';
+import { TrendingUp, Wallet, ArrowUpRight, ArrowDownRight, Activity, BrainCircuit, Send, AlertTriangle, Clock, Target, Sparkles, Flame, ShieldCheck, ChevronLeft, ChevronRight } from 'lucide-react';
+import { DailyBalance, Account, UserSettings, Transaction } from '../types';
 import { formatCurrency, groupDataByCategory, groupDailyToMonthly } from '../utils/financeUtils';
 import { ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import Card, { CardHeader, CardStat } from './ui/Card';
@@ -9,11 +9,47 @@ interface DashboardProps {
   timeline: DailyBalance[];
   accounts: Account[];
   settings: UserSettings;
+  transactions: Transaction[];
 }
 
-const CHART_COLORS = ['#10b981', '#06b6d4', '#6366f1', '#f59e0b', '#ef4444', '#a855f7', '#0ea5e9', '#84cc16'];
+const CHART_COLORS = [
+  '#10b981',
+  '#06b6d4',
+  '#6366f1',
+  '#f59e0b',
+  '#ef4444',
+  '#a855f7',
+  '#0ea5e9',
+  '#84cc16',
+  '#f97316',
+  '#22c55e',
+  '#3b82f6',
+  '#e11d48',
+];
 
-const Dashboard: React.FC<DashboardProps> = ({ timeline, accounts, settings }) => {
+const Dashboard: React.FC<DashboardProps> = ({ timeline, accounts, settings, transactions }) => {
+  const [categoryMonth, setCategoryMonth] = useState(new Date());
+
+  const categoryMonthKey = useMemo(() => {
+    const y = categoryMonth.getFullYear();
+    const m = String(categoryMonth.getMonth() + 1).padStart(2, '0');
+    return `${y}-${m}`;
+  }, [categoryMonth]);
+
+  const categoryMonthLabel = useMemo(() => {
+    return new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' })
+      .format(categoryMonth)
+      .replace(' de ', ' ')
+      .replace(/\b\w/, (c) => c.toUpperCase());
+  }, [categoryMonth]);
+
+  const changeCategoryMonth = (delta: number) => {
+    setCategoryMonth(prev => {
+      const next = new Date(prev);
+      next.setMonth(next.getMonth() + delta);
+      return next;
+    });
+  };
   const currentBalance = timeline[0]?.startBalance || 0;
   const endOfMonth = timeline[29]?.endBalance || 0;
 
@@ -35,8 +71,32 @@ const Dashboard: React.FC<DashboardProps> = ({ timeline, accounts, settings }) =
   const avgMonthlyExpense = monthlyChartData.reduce((acc, m) => acc + m.expense, 0) / (monthlyChartData.length || 1);
   const runwayMonths = avgMonthlyExpense > 0 ? liquidBalance / avgMonthlyExpense : 999;
 
-  const allTransactions = timeline.flatMap(t => t.transactions);
-  const expenseByCategory = groupDataByCategory(allTransactions, 'expense');
+  // Mescla transações reais com as projetadas da timeline para considerar recorrências futuras
+  const mergedTransactions = useMemo(() => {
+    const seen = new Set<string>();
+    const combined = [...transactions];
+    combined.forEach(t => seen.add(t.id || `${t.date}-${t.amount}-${t.description}-${t.type}`));
+    timeline.forEach(day => {
+      day.transactions.forEach(tx => {
+        const key = tx.id || `${tx.date}-${tx.amount}-${tx.description}-${tx.type}`;
+        if (!seen.has(key)) {
+          combined.push(tx);
+          seen.add(key);
+        }
+      });
+    });
+    return combined;
+  }, [transactions, timeline]);
+
+  // Filtra despesas do mês selecionado
+  const currentMonthExpenses = useMemo(() => {
+    return mergedTransactions.filter(t => {
+      if (!t.date?.startsWith(categoryMonthKey)) return false;
+      return t.type === 'expense' || t.type === 'daily' || t.type === 'economy';
+    });
+  }, [mergedTransactions, categoryMonthKey]);
+  const expenseByCategory = useMemo(() => groupDataByCategory(currentMonthExpenses, 'expense'), [currentMonthExpenses]);
+  const topExpenseCategories = useMemo(() => expenseByCategory.slice(0, 10), [expenseByCategory]);
   const biggestExpenseCategory = expenseByCategory[0];
 
   return (
@@ -210,6 +270,27 @@ const Dashboard: React.FC<DashboardProps> = ({ timeline, accounts, settings }) =
             title="Categorias de Despesa"
             subtitle="Últimos meses"
           />
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-xs text-slate-500">
+              Mostrando despesas de <span className="font-semibold text-slate-700">{categoryMonthLabel}</span>
+            </p>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => changeCategoryMonth(-1)}
+                className="p-1.5 rounded-md border border-slate-200 text-slate-500 hover:text-slate-700 hover:border-slate-300 transition-colors"
+                aria-label="Mês anterior"
+              >
+                <ChevronLeft size={14} />
+              </button>
+              <button
+                onClick={() => changeCategoryMonth(1)}
+                className="p-1.5 rounded-md border border-slate-200 text-slate-500 hover:text-slate-700 hover:border-slate-300 transition-colors"
+                aria-label="Próximo mês"
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          </div>
           {expenseByCategory.length === 0 ? (
             <p className="text-slate-400 text-sm">Sem dados suficientes.</p>
           ) : (
@@ -217,8 +298,8 @@ const Dashboard: React.FC<DashboardProps> = ({ timeline, accounts, settings }) =
               <div className="w-full md:w-1/2 h-56">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={expenseByCategory.slice(0,6)} dataKey="value" nameKey="name" innerRadius={50} outerRadius={80} paddingAngle={4}>
-                      {expenseByCategory.slice(0,6).map((entry, index) => (
+                    <Pie data={topExpenseCategories} dataKey="value" nameKey="name" innerRadius={50} outerRadius={80} paddingAngle={4}>
+                      {topExpenseCategories.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                       ))}
                     </Pie>
@@ -226,7 +307,7 @@ const Dashboard: React.FC<DashboardProps> = ({ timeline, accounts, settings }) =
                 </ResponsiveContainer>
               </div>
               <div className="flex-1 space-y-3">
-                {expenseByCategory.slice(0,6).map((cat, idx) => (
+                {topExpenseCategories.map((cat, idx) => (
                   <div key={cat.name} className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: CHART_COLORS[idx % CHART_COLORS.length] }}></span>

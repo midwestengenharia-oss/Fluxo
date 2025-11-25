@@ -12,21 +12,28 @@ import { transactionTypeColors, getColorClasses } from '../styles/tokens';
 interface TransactionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (t: Partial<Transaction>, installments: number, targetId: string, targetType: 'account' | 'card') => void;
-  onDelete?: (id: string) => void;
+  onSave: (
+    t: Partial<Transaction>,
+    installments: number,
+    targetId: string,
+    targetType: 'account' | 'card',
+    recurrenceScope?: 'single' | 'from_here' | 'all'
+  ) => void;
+  onDelete?: (id: string, opts?: { recurrenceScope?: 'single' | 'from_here' | 'all' }) => void;
   initialDate?: string;
   transactionToEdit?: Transaction;
   accounts: Account[];
   creditCards: CreditCard[];
   isSimulationMode: boolean;
   customCategories: UserSettings['customCategories'];
+  onAddCategory: (type: TransactionType, label: string) => void;
 }
 
 const TransactionModal: React.FC<TransactionModalProps> = ({
   isOpen, onClose, onSave, onDelete,
   initialDate, transactionToEdit,
   accounts, creditCards, isSimulationMode,
-  customCategories
+  customCategories, onAddCategory
 }) => {
   const spendableAccounts = useMemo(() => {
     const allowed = new Set<Account['type']>(['checking', 'savings', 'cash']);
@@ -39,10 +46,14 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
   const [date, setDate] = useState('');
   const [status, setStatus] = useState<'pending' | 'paid'>('pending');
   const [installments, setInstallments] = useState('1');
+  const [showAddCategory, setShowAddCategory] = useState(false);
+  const [newCategory, setNewCategory] = useState('');
 
   // Selection State
   const [targetType, setTargetType] = useState<'account' | 'card'>('account');
   const [selectedId, setSelectedId] = useState<string>('');
+  const isProjected = transactionToEdit?.id?.startsWith('proj-') || false;
+  const [recurrenceScope, setRecurrenceScope] = useState<'single' | 'from_here' | 'all'>('single');
 
   const activeCategories = useMemo(() => {
     const defaults = DEFAULT_CATEGORIES[type] || [];
@@ -81,6 +92,11 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
         setTargetType('account');
         setSelectedId(transactionToEdit.accountId || '');
       }
+      if (transactionToEdit.id?.startsWith('proj-')) {
+        setRecurrenceScope('single');
+      }
+      setShowAddCategory(false);
+      setNewCategory('');
     } else {
       // Defaults
       setType('expense');
@@ -92,6 +108,9 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
       setInstallments('1');
       setTargetType('account');
       if (spendableAccounts.length > 0) setSelectedId(spendableAccounts[0].id);
+      setRecurrenceScope('single');
+      setShowAddCategory(false);
+      setNewCategory('');
     }
   }, [isOpen, transactionToEdit, initialDate, spendableAccounts]);
 
@@ -146,7 +165,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
       category: category || 'Outros',
       date,
       status: targetType === 'card' ? 'pending' : status,
-    }, finalInstallments, selectedId, targetType);
+    }, finalInstallments, selectedId, targetType, isProjected ? recurrenceScope : undefined);
 
     onClose();
   };
@@ -154,10 +173,19 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
   const handleDelete = () => {
     if (transactionToEdit && onDelete) {
       if (window.confirm("Tem certeza que deseja excluir este lançamento?")) {
-        onDelete(transactionToEdit.id);
+        onDelete(transactionToEdit.id, isProjected ? { recurrenceScope } : undefined);
         onClose();
       }
     }
+  };
+
+  const handleAddCategory = () => {
+    const trimmed = newCategory.trim();
+    if (!trimmed) return;
+    onAddCategory(type, trimmed);
+    setCategory(trimmed);
+    setNewCategory('');
+    setShowAddCategory(false);
   };
 
   const getStatusLabels = () => {
@@ -218,6 +246,35 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
       }
     >
       <form onSubmit={handleSubmit} className="space-y-8">
+
+        {isProjected && (
+          <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-2">Escopo da alteração</p>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { id: 'single', label: 'Só esta' },
+                { id: 'from_here', label: 'Esta e próximas' },
+                { id: 'all', label: 'Toda a regra' },
+              ].map(opt => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setRecurrenceScope(opt.id as any)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-colors ${
+                    recurrenceScope === opt.id
+                      ? 'bg-slate-900 text-white border-slate-900'
+                      : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-slate-400 mt-1">
+              Aplique a mudança só nesta ocorrência, desta data em diante ou na regra inteira.
+            </p>
+          </div>
+        )}
 
         {/* 1. Value & Type */}
         <div className="flex flex-col md:flex-row gap-8">
@@ -358,7 +415,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
         {/* 4. Categories Pills */}
         <div>
           <label className="block text-xs font-bold text-slate-400 uppercase mb-3 tracking-wider">Categoria</label>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 items-center">
             {activeCategories.map(cat => (
               <button
                 key={cat}
@@ -373,7 +430,27 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                 {cat}
               </button>
             ))}
+            <button
+              type="button"
+              onClick={() => setShowAddCategory(prev => !prev)}
+              className="px-2.5 py-1.5 rounded-full text-xs font-bold border border-slate-300 text-slate-600 hover:border-slate-500 hover:text-slate-800 transition-colors"
+            >
+              +
+            </button>
           </div>
+          {showAddCategory && (
+            <div className="mt-2 flex gap-2 items-center">
+              <input
+                type="text"
+                value={newCategory}
+                onChange={e => setNewCategory(e.target.value)}
+                placeholder="Nova categoria"
+                className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-slate-900"
+              />
+              <Button type="button" variant="primary" onClick={handleAddCategory}>Salvar</Button>
+              <Button type="button" variant="ghost" onClick={() => { setShowAddCategory(false); setNewCategory(''); }}>Cancelar</Button>
+            </div>
+          )}
         </div>
 
         {/* 5. Extra Options (Status or Installments) */}

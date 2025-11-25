@@ -1,5 +1,5 @@
 ﻿﻿import React, { useState } from 'react';
-import { Account, CreditCard, Transaction } from '../types';
+import { Account, CreditCard, Transaction, Recurrence } from '../types';
 import { formatCurrency } from '../utils/financeUtils';
 import { Plus, CreditCard as CreditCardIcon, Landmark, Wallet, Trash2, Edit2, Wifi, Eye, Briefcase } from 'lucide-react';
 import AccountModal from './AccountModal';
@@ -15,6 +15,8 @@ interface AccountManagerProps {
   accounts: Account[];
   creditCards: CreditCard[];
   transactions: Transaction[];
+  recurrences: Recurrence[];
+  projectedTransactions?: Transaction[];
   onAddAccount: (account: Account) => void;
   onAddCard: (card: CreditCard) => void;
   onDeleteAccount: (id: string) => void;
@@ -22,7 +24,7 @@ interface AccountManagerProps {
 }
 
 const AccountManager: React.FC<AccountManagerProps> = ({
-  accounts, creditCards, transactions,
+  accounts, creditCards, transactions, recurrences, projectedTransactions = [],
   onAddAccount, onAddCard,
   onDeleteAccount, onDeleteCard
 }) => {
@@ -64,7 +66,6 @@ const AccountManager: React.FC<AccountManagerProps> = ({
   const AccountCard = ({ acc, isInvestment = false }: { acc: Account; isInvestment?: boolean }) => {
     const colorClasses = getColorClasses(acc.color);
     const accountLabel = isInvestment ? 'Carteira de Investimentos' : acc.type === 'checking' ? 'Conta Corrente' : 'Carteira Física';
-
     return (
       <Card
         variant="elevated"
@@ -105,7 +106,6 @@ const AccountManager: React.FC<AccountManagerProps> = ({
   // Credit Card Component
   const CreditCardComponent = ({ card }: { card: CreditCard }) => {
     const colorClasses = getColorClasses(card.color);
-
     return (
       <div
         onClick={() => setViewCard(card)}
@@ -116,7 +116,7 @@ const AccountManager: React.FC<AccountManagerProps> = ({
         <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none"></div>
         <div className="absolute -top-24 -right-24 w-48 h-48 bg-white/20 rounded-full blur-3xl pointer-events-none"></div>
 
-        <div className="relative z-10 flex flex-col justify-between h-full">
+        <div className="relative z-10 flex flex-col h-full gap-4">
           <div className="flex justify-between items-start">
             <div className="flex items-center gap-2">
               <div className="w-10 h-7 bg-yellow-200/80 rounded-md flex items-center justify-center relative overflow-hidden border border-yellow-400/50">
@@ -269,12 +269,15 @@ const AccountManager: React.FC<AccountManagerProps> = ({
       <CardDetailModal
         card={viewCard}
         transactions={transactions}
+        recurrences={recurrences}
         onClose={() => setViewCard(null)}
       />
 
       <AccountDetailModal
         account={viewAccount}
         transactions={transactions}
+        projectedTransactions={projectedTransactions}
+        recurrences={recurrences}
         onClose={() => setViewAccount(null)}
       />
     </div>

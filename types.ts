@@ -67,6 +67,21 @@ export interface Recurrence {
   targetCardId?: string;
 }
 
+export interface RecurrenceOverride {
+  id: string;
+  recurrenceId: string;
+  effectiveFrom: string; // date the override applies from
+  scope: 'single' | 'from_here';
+  deleteFlag?: boolean;
+  amount?: number;
+  description?: string;
+  category?: string;
+  targetAccountId?: string;
+  targetCardId?: string;
+  status?: TransactionStatus;
+  createdAt?: string;
+}
+
 export interface HealthLevel {
     id: string;
     label: string;

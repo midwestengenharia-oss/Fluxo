@@ -15,6 +15,7 @@ interface RecurrenceManagerProps {
   onAddRecurrence: (r: Recurrence) => void;
   onDeleteRecurrence: (id: string) => void;
   customCategories: UserSettings['customCategories'];
+  onAddCategory: (type: Recurrence['type'], label: string) => void;
   accounts: Account[];
   creditCards: CreditCard[];
 }
@@ -24,6 +25,7 @@ const RecurrenceManager: React.FC<RecurrenceManagerProps> = ({
   onAddRecurrence,
   onDeleteRecurrence,
   customCategories,
+  onAddCategory,
   accounts,
   creditCards
 }) => {
@@ -46,7 +48,8 @@ const RecurrenceManager: React.FC<RecurrenceManagerProps> = ({
     setIsModalOpen(true);
   };
 
-  const sortedRecurrences = [...recurrences].sort((a, b) => {
+  const activeRecurrences = recurrences.filter(r => r.active !== false);
+  const sortedRecurrences = [...activeRecurrences].sort((a, b) => {
     if (a.frequency === 'daily' && b.frequency !== 'daily') return -1;
     if (a.frequency !== 'daily' && b.frequency === 'daily') return 1;
     return a.dayOfMonth - b.dayOfMonth;
@@ -123,7 +126,11 @@ const RecurrenceManager: React.FC<RecurrenceManagerProps> = ({
                         />
                         <ActionIcon
                           icon={<Trash2 size={16} />}
-                          onClick={() => onDeleteRecurrence(rec.id)}
+                          onClick={() => {
+                            if (window.confirm('Deseja remover esta recorrência? Isso para projeções futuras, mas mantém o histórico.')) {
+                              onDeleteRecurrence(rec.id);
+                            }
+                          }}
                           color="danger"
                         />
                       </div>
@@ -142,6 +149,7 @@ const RecurrenceManager: React.FC<RecurrenceManagerProps> = ({
         onSave={handleSave}
         recurrenceToEdit={recurrenceToEdit}
         customCategories={customCategories}
+        onAddCategory={onAddCategory}
         accounts={accounts}
         creditCards={creditCards}
       />

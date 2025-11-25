@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { LayoutDashboard, CalendarDays, PiggyBank, Menu, Settings as SettingsIcon, Plus, Sparkles, CreditCard, RefreshCcw, X, LogOut, Check, Trash2 } from 'lucide-react';
-import { Transaction, Account, CreditCard as CreditCardType, Recurrence, TransactionType, UserSettings, DEFAULT_CATEGORIES, DEFAULT_HEALTH_LEVELS, HealthLevel } from './types';
+import { Transaction, Account, CreditCard as CreditCardType, Recurrence, TransactionType, UserSettings, DEFAULT_CATEGORIES, DEFAULT_HEALTH_LEVELS, HealthLevel, RecurrenceOverride } from './types';
 import { calculateTimeline, calculateEconomy, processCreditCardTransaction, generateUUID } from './utils/financeUtils';
 import { supabase } from './utils/supabaseClient';
 import Dashboard from './components/Dashboard';
@@ -84,6 +84,21 @@ const mapRecurrenceFromDB = (dbRec: any): Recurrence => {
     };
 };
 
+const mapRecurrenceOverrideFromDB = (db: any): RecurrenceOverride => ({
+    id: db.id,
+    recurrenceId: db.recurrence_id,
+    effectiveFrom: db.effective_from,
+    scope: db.scope,
+    deleteFlag: db.delete_flag,
+    amount: db.amount !== null && db.amount !== undefined ? Number(db.amount) : undefined,
+    description: db.description || undefined,
+    category: db.category || undefined,
+    targetAccountId: db.target_account_id || undefined,
+    targetCardId: db.target_card_id || undefined,
+    status: db.status ? db.status.toLowerCase() : undefined,
+    createdAt: db.created_at || undefined,
+});
+
 const getErrorMessage = (error: any): string => {
     if (typeof error === 'string') return error;
     if (error?.message) return error.message;
@@ -129,6 +144,13 @@ const normalizeHealthLevels = (levels: any[]): HealthLevel[] => {
     }));
 };
 
+const parseProjectedMeta = (projId: string | undefined | null) => {
+    if (!projId) return null;
+    const match = projId.match(/^proj-(?:daily|monthly)-(.+)-(\d{4}-\d{2}-\d{2})$/);
+    if (!match) return null;
+    return { recurrenceId: match[1], date: match[2] };
+};
+
 const App: React.FC = () => {
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -142,6 +164,7 @@ const App: React.FC = () => {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [creditCards, setCreditCards] = useState<CreditCardType[]>([]);
   const [recurrences, setRecurrences] = useState<Recurrence[]>([]);
+  const [recurrenceOverrides, setRecurrenceOverrides] = useState<RecurrenceOverride[]>([]);
   const [settings, setSettings] = useState<UserSettings>({
       healthLevels: DEFAULT_HEALTH_LEVELS,
       customCategories: DEFAULT_CATEGORIES
@@ -176,6 +199,7 @@ const App: React.FC = () => {
           setAccounts([]);
           setCreditCards([]);
           setRecurrences([]);
+          setRecurrenceOverrides([]);
       }
     });
 
@@ -188,18 +212,20 @@ const App: React.FC = () => {
           const { data: { user } } = await supabase.auth.getUser();
           if (!user) return;
 
-          const [accRes, cardRes, recRes, txRes, setRes] = await Promise.all([
-              supabase.from('accounts').select('*'),
-              supabase.from('credit_cards').select('*'),
-              supabase.from('recurring_rules').select('*'),
-              supabase.from('transactions').select('*'),
-              supabase.from('user_settings').select('*').eq('user_id', user.id).maybeSingle()
+          const [accRes, cardRes, recRes, txRes, setRes, overrideRes] = await Promise.all([
+              supabase.from('accounts').select('*').eq('user_id', user.id),
+              supabase.from('credit_cards').select('*').eq('user_id', user.id),
+              supabase.from('recurring_rules').select('*').eq('user_id', user.id),
+              supabase.from('transactions').select('*').eq('user_id', user.id),
+              supabase.from('user_settings').select('*').eq('user_id', user.id).maybeSingle(),
+              supabase.from('recurrence_overrides').select('*')
           ]);
 
           if (accRes.data) setAccounts(accRes.data.map(mapAccountFromDB));
           if (cardRes.data) setCreditCards(cardRes.data.map(mapCardFromDB));
           if (recRes.data) setRecurrences(recRes.data.map(mapRecurrenceFromDB));
           if (txRes.data) setTransactions(txRes.data.map(mapTransactionFromDB));
+          if (overrideRes.data) setRecurrenceOverrides(overrideRes.data.map(mapRecurrenceOverrideFromDB));
           
           let nextSettings: UserSettings | null = null;
 
@@ -289,6 +315,41 @@ const App: React.FC = () => {
       }
   }
 
+  const handleAddCustomCategory = async (catType: TransactionType, label: string) => {
+      const trimmed = (label || '').trim();
+      if (!trimmed) return;
+
+      const updatedCategories = {
+          ...settings.customCategories,
+          [catType]: Array.from(new Set([...(settings.customCategories[catType] || []), trimmed]))
+      };
+
+      setSettings(prev => ({
+          ...prev,
+          customCategories: updatedCategories
+      }));
+
+      try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) return;
+          const { data, error } = await supabase.from('user_settings').upsert({
+              user_id: user.id,
+              health_levels: settings.healthLevels,
+              custom_categories: updatedCategories
+          }, { onConflict: 'user_id' }).select().maybeSingle();
+          if (error) throw error;
+          if (data) {
+              setSettings(prev => ({
+                  ...prev,
+                  customCategories: data.custom_categories || updatedCategories
+              }));
+          }
+      } catch (e) {
+          console.error('Erro ao salvar categoria customizada:', e);
+      }
+  };
+
+
   // --- MERGED DATA (REAL + SIMULATION) ---
   const allTransactions = useMemo(() => {
     if (!simulationMode) return transactions;
@@ -316,9 +377,10 @@ const App: React.FC = () => {
         allRecurrences, 
         startOfMonth, 
         365,
-        settings.healthLevels
+        settings.healthLevels,
+        recurrenceOverrides
     );
-  }, [allTransactions, allRecurrences, accounts, creditCards, dataLoading, settings.healthLevels]);
+  }, [allTransactions, allRecurrences, accounts, creditCards, dataLoading, settings.healthLevels, recurrenceOverrides]);
 
   const economyData = useMemo(() => {
     // Combinar transações reais (incluindo meses passados) com projetadas
@@ -337,7 +399,7 @@ const App: React.FC = () => {
 
   // --- HANDLERS ---
 
-  const handleSaveTransaction = async (t: Partial<Transaction>, installments: number = 1, targetId: string, targetType: 'account' | 'card') => {
+  const handleSaveTransaction = async (t: Partial<Transaction>, installments: number = 1, targetId: string, targetType: 'account' | 'card', recurrenceScope?: 'single' | 'from_here' | 'all') => {
     
     // --- SIMULATION LOGIC ---
     if (simulationMode) {
@@ -374,6 +436,11 @@ const App: React.FC = () => {
         return;
     }
 
+    const projectedMeta = t.id && t.id.startsWith('proj-') ? parseProjectedMeta(t.id) : null;
+    const projectedRecurrenceId = t.originalTransactionId || projectedMeta?.recurrenceId || null;
+    const projectedDate = t.date || projectedMeta?.date || undefined;
+    const isProjected = !!t.id && t.id.startsWith('proj-');
+
     // --- REAL DB LOGIC ---
     try {
         const { data: { user } } = await supabase.auth.getUser();
@@ -381,6 +448,34 @@ const App: React.FC = () => {
 
         if (!targetId || targetId === '') throw new Error("Destino inválido.");
         if (!t.amount || isNaN(t.amount)) throw new Error("Valor inválido.");
+
+        // Projeções de recorrência: salvar override ao invés de criar transação real
+        if (isProjected && projectedRecurrenceId && (t.date || projectedDate)) {
+            const scopeField = recurrenceScope === 'from_here' || recurrenceScope === 'all' ? 'from_here' : 'single';
+            const overridePayload: any = {
+                recurrence_id: projectedRecurrenceId,
+                effective_from: t.date || projectedDate,
+                scope: scopeField,
+                delete_flag: false,
+                amount: t.amount,
+                description: t.description,
+                category: t.category,
+                status: (t.status || 'pending').toUpperCase(),
+                target_account_id: targetType === 'account' ? targetId : null,
+                target_card_id: targetType === 'card' ? targetId : null
+            };
+
+            const { data, error } = await supabase.from('recurrence_overrides').upsert(overridePayload).select().maybeSingle();
+            if (error) throw error;
+            const mapped = data ? mapRecurrenceOverrideFromDB(data) : null;
+            if (mapped) {
+                setRecurrenceOverrides(prev => {
+                    const filtered = prev.filter(o => !(o.recurrenceId === mapped.recurrenceId && o.effectiveFrom === mapped.effectiveFrom && o.scope === mapped.scope));
+                    return [...filtered, mapped];
+                });
+            }
+            return;
+        }
 
         // Transações projetadas (proj-*) não existem no banco, então devem ser criadas como novas
         const isProjectedTransaction = t.id?.startsWith('proj-');
@@ -473,7 +568,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleDeleteTransaction = async (id: string) => {
+  const handleDeleteTransaction = async (id: string, opts?: { recurrenceScope?: 'single' | 'from_here' | 'all', date?: string }) => {
       if (simulationMode) {
           const isSimulatedOnly = simulatedTransactions.some(t => t.id === id);
           if (isSimulatedOnly) {
@@ -481,6 +576,42 @@ const App: React.FC = () => {
           } else {
               setSimulatedDeletions(prev => [...prev, id]);
           }
+          return;
+      }
+
+      // Transações projetadas (proj-*) devem virar override de exclusão
+      const projectedMeta = id.startsWith('proj-') ? parseProjectedMeta(id) : null;
+      const projectedTx = transactionToEdit && transactionToEdit.id === id && id.startsWith('proj-') ? transactionToEdit : undefined;
+      const recurrenceId = projectedTx?.originalTransactionId || projectedMeta?.recurrenceId;
+      const effectiveDate = opts?.date || projectedTx?.date || projectedMeta?.date;
+
+      if (id.startsWith('proj-') && recurrenceId && effectiveDate) {
+          const scopeField = opts?.recurrenceScope === 'from_here' || opts?.recurrenceScope === 'all' ? 'from_here' : 'single';
+          try {
+              const { data: { user } } = await supabase.auth.getUser();
+              if (!user) throw new Error("Usuário não logado.");
+              const payload: any = {
+                  recurrence_id: recurrenceId,
+                  effective_from: effectiveDate,
+                  scope: scopeField,
+                  delete_flag: true
+              };
+              const { data, error } = await supabase.from('recurrence_overrides').upsert(payload).select().maybeSingle();
+              if (error) throw error;
+              const mapped = data ? mapRecurrenceOverrideFromDB(data) : null;
+              if (mapped) {
+                  setRecurrenceOverrides(prev => {
+                      const filtered = prev.filter(o => !(o.recurrenceId === mapped.recurrenceId && o.effectiveFrom === mapped.effectiveFrom && o.scope === mapped.scope));
+                      return [...filtered, mapped];
+                  });
+              }
+          } catch (e) {
+              alert("Erro ao excluir projeção: " + getErrorMessage(e));
+          }
+          return;
+      }
+      if (id.startsWith('proj-')) {
+          console.warn('Ignorando delete de transação projetada (não existe no banco):', id);
           return;
       }
 
@@ -561,9 +692,35 @@ const App: React.FC = () => {
           return;
       }
 
-      const { error } = await supabase.from('recurring_rules').delete().eq('id', id);
-      if (!error) {
-          setRecurrences(prev => prev.filter(r => r.id !== id));
+      // Soft delete: desativa e corta projeções futuras, preservando histórico
+      try {
+          const todayStr = new Date().toISOString().split('T')[0];
+          const { data, error } = await supabase
+              .from('recurring_rules')
+              .update({ active: false, end_date: todayStr })
+              .eq('id', id)
+              .select()
+              .maybeSingle();
+          if (error) throw error;
+          setRecurrences(prev => prev.map(r => r.id === id ? { ...r, active: false, endDate: todayStr } : r));
+
+          // Cria override from_here para cortar projeções futuras desta recorrência
+          const { data: ovData, error: ovError } = await supabase.from('recurrence_overrides').upsert({
+              recurrence_id: id,
+              effective_from: todayStr,
+              scope: 'from_here',
+              delete_flag: true
+          }).select().maybeSingle();
+          if (ovError) throw ovError;
+          const mapped = ovData ? mapRecurrenceOverrideFromDB(ovData) : null;
+          if (mapped) {
+              setRecurrenceOverrides(prev => {
+                  const filtered = prev.filter(o => !(o.recurrenceId === mapped.recurrenceId && o.effectiveFrom === mapped.effectiveFrom && o.scope === mapped.scope));
+                  return [...filtered, mapped];
+              });
+          }
+      } catch (e) {
+          alert("Erro ao desativar recorrência: " + getErrorMessage(e));
       }
   };
 
@@ -845,7 +1002,14 @@ const App: React.FC = () => {
 
         <div className="max-w-7xl mx-auto w-full p-4 md:p-8 pb-24">
           
-          {activeTab === 'dashboard' && <Dashboard timeline={timeline} accounts={accounts} settings={settings} />}
+          {activeTab === 'dashboard' && (
+            <Dashboard
+              timeline={timeline}
+              accounts={accounts}
+              settings={settings}
+              transactions={allTransactions}
+            />
+          )}
           {activeTab === 'flow' &&
             <CashFlow
                 timeline={timeline}
@@ -870,6 +1034,7 @@ const App: React.FC = () => {
                     recurrences={allRecurrences}
                     onAddRecurrence={handleAddRecurrence}
                     onDeleteRecurrence={handleDeleteRecurrence}
+                    onAddCategory={handleAddCustomCategory}
                     customCategories={settings.customCategories}
                     accounts={accounts}
                     creditCards={creditCards}
@@ -880,6 +1045,8 @@ const App: React.FC = () => {
                     accounts={accounts}
                     creditCards={creditCards}
                     transactions={allTransactions}
+                    projectedTransactions={timeline.flatMap(day => day.transactions)}
+                    recurrences={allRecurrences}
                     onAddAccount={handleAddAccount}
                     onAddCard={handleAddCard}
                     onDeleteAccount={handleDeleteAccount}
@@ -901,11 +1068,13 @@ const App: React.FC = () => {
             creditCards={creditCards}
             isSimulationMode={simulationMode}
             customCategories={settings.customCategories}
+            onAddCategory={handleAddCustomCategory}
         />
 
         <CardDetailModal 
             card={cardToView}
             transactions={allTransactions}
+            recurrences={allRecurrences}
             onClose={() => setCardToView(null)}
         />
 

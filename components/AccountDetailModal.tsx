@@ -1,7 +1,7 @@
-import React from 'react';
-import { Account, Transaction } from '../types';
+import React, { useMemo, useState } from 'react';
+import { Account, Transaction, Recurrence } from '../types';
 import { formatCurrency, formatDate } from '../utils/financeUtils';
-import { X, TrendingUp, TrendingDown, Wallet, Landmark } from 'lucide-react';
+import { X, TrendingUp, TrendingDown, Wallet, Landmark, RefreshCw } from 'lucide-react';
 import { AreaChart, Area, ResponsiveContainer } from 'recharts';
 import { getColorClasses } from '../styles/tokens';
 import EmptyState from './ui/EmptyState';
@@ -9,14 +9,43 @@ import EmptyState from './ui/EmptyState';
 interface AccountDetailModalProps {
   account: Account | null;
   transactions: Transaction[];
+  projectedTransactions?: Transaction[];
+  recurrences: Recurrence[];
   onClose: () => void;
 }
 
-const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ account, transactions, onClose }) => {
+const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ account, transactions, projectedTransactions = [], recurrences, onClose }) => {
   if (!account) return null;
 
+  const [activeTab, setActiveTab] = useState<'statement' | 'recurrences'>('statement');
   const colorClasses = getColorClasses(account.color);
-  const accTransactions = transactions.filter(t => t.accountId === account.id).sort((a, b) => b.date.localeCompare(a.date));
+  const accTransactions = useMemo(() => {
+    // Mostrar apenas movimentos confirmados, desconsiderando projeções/simulações para evitar itens excluídos ou desatualizados.
+    const merged = [
+      ...transactions.filter(t => !t.isSimulation && !t.isProjected),
+      ...projectedTransactions.filter(t => !t.isSimulation && !t.isProjected),
+    ];
+
+    const byId = new Map<string, Transaction>();
+    merged.forEach(t => {
+      const key = t.id || `${t.date}-${t.amount}-${t.description}`;
+      // Se houver colisão, mantém o primeiro confirmado (não simulation/projected)
+      if (!byId.has(key)) {
+        byId.set(key, t);
+      }
+    });
+
+    const allowedStatuses = ['paid', 'recebido', 'realizado', 'investido'];
+
+    return Array.from(byId.values())
+      .filter(t => t.accountId === account.id)
+      .filter(t => allowedStatuses.includes((t.status || '').toLowerCase()))
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }, [transactions, projectedTransactions, account.id]);
+  const accRecurrences = useMemo(
+    () => recurrences.filter(r => r.targetAccountId === account.id && r.active !== false),
+    [recurrences, account.id]
+  );
 
   // Calculate simple balance history
   const balanceHistory = [...accTransactions].reverse().reduce((acc: any[], t) => {
@@ -84,33 +113,93 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ account, transa
           </div>
         </div>
 
-        {/* Transactions List */}
-        <div className="flex-1 bg-white/90 p-6 overflow-y-auto custom-scrollbar">
-          <h4 className="text-sm font-bold text-slate-400 uppercase mb-4 tracking-wider">Extrato de Lançamentos</h4>
-          <div className="space-y-3">
-            {accTransactions.length === 0 ? (
-              <EmptyState
-                icon={<Wallet size={32} />}
-                title="Nenhuma movimentação"
-                description="Ainda não há lançamentos registrados nesta conta."
-              />
-            ) : (
-              accTransactions.map(t => (
-                <div key={t.id} className="flex items-center justify-between p-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 rounded-lg transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-2 h-2 rounded-full ${t.type === 'income' ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
-                    <div>
-                      <p className="font-bold text-slate-700 text-sm">{t.description}</p>
-                      <p className="text-xs text-slate-400">{formatDate(t.date)} • {t.category}</p>
-                    </div>
-                  </div>
-                  <span className={`font-mono font-bold text-sm ${t.type === 'income' ? 'text-emerald-600' : 'text-slate-800'}`}>
-                    {t.type === 'income' ? '+' : '-'}{formatCurrency(t.amount)}
-                  </span>
-                </div>
-              ))
-            )}
+        {/* Transactions / Recurrences */}
+        <div className="flex-1 bg-white/90 p-6 overflow-y-auto custom-scrollbar flex flex-col">
+          <div className="flex items-center gap-4 mb-4 border-b border-slate-100">
+            <button
+              onClick={() => setActiveTab('statement')}
+              className={`py-2 text-sm font-bold border-b-2 transition-colors ${activeTab === 'statement' ? `${colorClasses.border} ${colorClasses.text}` : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+            >
+              Extrato
+            </button>
+            <button
+              onClick={() => setActiveTab('recurrences')}
+              className={`py-2 text-sm font-bold border-b-2 transition-colors ${activeTab === 'recurrences' ? `${colorClasses.border} ${colorClasses.text}` : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+            >
+              Recorrências
+            </button>
           </div>
+
+          {activeTab === 'statement' && (
+            <div className="space-y-3">
+              {accTransactions.length === 0 ? (
+                <EmptyState
+                  icon={<Wallet size={32} />}
+                  title="Nenhuma movimentação"
+                  description="Ainda não há lançamentos registrados nesta conta."
+                />
+              ) : (
+                accTransactions.map(t => (
+                  <div
+                    key={t.id}
+                    className="flex items-center justify-between p-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 rounded-lg transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-2 h-2 rounded-full ${t.type === 'income' ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
+                      <div>
+                        <p className="font-bold text-slate-700 text-sm">{t.description}</p>
+                        <p className="text-xs text-slate-400">{formatDate(t.date)} • {t.category}</p>
+                      </div>
+                    </div>
+                    <span className={`font-mono font-bold text-sm ${t.type === 'income' ? 'text-emerald-600' : 'text-slate-800'}`}>
+                      {t.type === 'income' ? '+' : '-'}{formatCurrency(t.amount)}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
+          {activeTab === 'recurrences' && (
+            <div className="space-y-3">
+              {accRecurrences.length === 0 ? (
+                <EmptyState
+                  icon={<RefreshCw size={32} />}
+                  title="Nenhuma recorrência"
+                  description="Não há regras recorrentes vinculadas a esta conta."
+                />
+              ) : (
+                accRecurrences
+                  .sort((a, b) => {
+                    if (a.frequency === 'daily' && b.frequency !== 'daily') return -1;
+                    if (b.frequency === 'daily' && a.frequency !== 'daily') return 1;
+                    return (a.dayOfMonth ?? 31) - (b.dayOfMonth ?? 31);
+                  })
+                  .map(r => (
+                    <div
+                      key={r.id}
+                      className="flex items-center justify-between p-3 border border-slate-100 rounded-lg hover:bg-slate-50 transition-colors shadow-sm"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                          <RefreshCw size={18} />
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-700 text-sm">{r.description}</p>
+                          <p className="text-[11px] text-slate-500">
+                            {r.frequency === 'daily' ? 'Todo dia' : r.dayOfMonth ? `Todo mês no dia ${r.dayOfMonth}` : 'Mensal'} • {r.category}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-mono font-bold text-slate-800">{formatCurrency(r.amount)}</p>
+                        <p className="text-[10px] text-slate-400 capitalize">{r.type}</p>
+                      </div>
+                    </div>
+                  ))
+              )}
+            </div>
+          )}
         </div>
 
       </div>

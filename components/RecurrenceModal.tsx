@@ -14,11 +14,12 @@ interface RecurrenceModalProps {
   onSave: (r: Recurrence) => void;
   recurrenceToEdit?: Recurrence;
   customCategories: UserSettings['customCategories'];
+  onAddCategory: (type: TransactionType, label: string) => void;
   accounts: Account[];
   creditCards: CreditCard[];
 }
 
-const RecurrenceModal: React.FC<RecurrenceModalProps> = ({ isOpen, onClose, onSave, recurrenceToEdit, customCategories, accounts, creditCards }) => {
+const RecurrenceModal: React.FC<RecurrenceModalProps> = ({ isOpen, onClose, onSave, recurrenceToEdit, customCategories, onAddCategory, accounts, creditCards }) => {
   const spendableAccounts = useMemo(() => {
     const allowed = new Set<Account['type']>(['checking', 'savings', 'cash']);
     return accounts.filter(a => allowed.has(a.type));
@@ -29,6 +30,8 @@ const RecurrenceModal: React.FC<RecurrenceModalProps> = ({ isOpen, onClose, onSa
   const [dayOfMonth, setDayOfMonth] = useState(5);
   const [type, setType] = useState<TransactionType>('expense');
   const [category, setCategory] = useState('Outros');
+  const [newCategory, setNewCategory] = useState('');
+  const [showAddCategory, setShowAddCategory] = useState(false);
   const [startFrom, setStartFrom] = useState('');
   const [occurrenceCount, setOccurrenceCount] = useState<string>('');
   const [targetType, setTargetType] = useState<'account' | 'card'>('account');
@@ -87,6 +90,8 @@ const RecurrenceModal: React.FC<RecurrenceModalProps> = ({ isOpen, onClose, onSa
       setOccurrenceCount('');
       setTargetType('account');
       setSelectedTargetId(spendableAccounts[0]?.id || '');
+      setShowAddCategory(false);
+      setNewCategory('');
     }
   }, [isOpen, recurrenceToEdit, spendableAccounts]);
 
@@ -146,6 +151,14 @@ const RecurrenceModal: React.FC<RecurrenceModalProps> = ({ isOpen, onClose, onSa
       targetCardId: targetType === 'card' ? selectedTargetId : undefined
     });
     onClose();
+  };
+
+  const handleAddCategory = () => {
+    const trimmed = newCategory.trim();
+    if (!trimmed) return;
+    onAddCategory(type, trimmed);
+    setCategory(trimmed);
+    setNewCategory('');
   };
 
   // Quando muda o tipo de destino, seleciona o primeiro item disponível
@@ -383,7 +396,7 @@ const RecurrenceModal: React.FC<RecurrenceModalProps> = ({ isOpen, onClose, onSa
         {/* Category */}
         <div>
           <label className="block text-xs font-bold text-slate-400 uppercase mb-2 tracking-wider">Categoria</label>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 items-center">
             {activeCategories.map(cat => (
               <button
                 key={cat}
@@ -398,7 +411,27 @@ const RecurrenceModal: React.FC<RecurrenceModalProps> = ({ isOpen, onClose, onSa
                 {cat}
               </button>
             ))}
+            <button
+              type="button"
+              onClick={() => setShowAddCategory(prev => !prev)}
+              className="px-2.5 py-1.5 rounded-full text-xs font-bold border border-slate-300 text-slate-600 hover:border-slate-500 hover:text-slate-800 transition-colors"
+            >
+              +
+            </button>
           </div>
+          {showAddCategory && (
+            <div className="mt-2 flex gap-2 items-center">
+              <input
+                type="text"
+                value={newCategory}
+                onChange={e => setNewCategory(e.target.value)}
+                placeholder="Nova categoria"
+                className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-slate-900"
+              />
+              <Button type="button" variant="primary" onClick={handleAddCategory}>Salvar</Button>
+              <Button type="button" variant="ghost" onClick={() => { setShowAddCategory(false); setNewCategory(''); }}>Cancelar</Button>
+            </div>
+          )}
         </div>
       </form>
     </Modal>

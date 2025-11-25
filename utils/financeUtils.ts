@@ -1,5 +1,5 @@
 
-import { Transaction, DailyBalance, Account, CreditCard, MonthlySummary, Recurrence, HealthLevel } from '../types';
+import { Transaction, DailyBalance, Account, CreditCard, MonthlySummary, Recurrence, HealthLevel, RecurrenceOverride } from '../types';
 
 export const generateUUID = () => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -137,7 +137,8 @@ export const calculateTimeline = (
   recurrences: Recurrence[],
   startDate: string,
   daysToProject: number = 365,
-  healthLevels: HealthLevel[]
+  healthLevels: HealthLevel[],
+  recurrenceOverrides: RecurrenceOverride[] = []
 ): DailyBalance[] => {
   
   // Initial Balance considers only liquid assets (not investments/wallets) usually, 
@@ -152,8 +153,68 @@ export const calculateTimeline = (
 
   const projectedRecurrences: Transaction[] = [];
   const makeUTCDate = (year: number, month: number, day: number) => new Date(Date.UTC(year, month, day));
+
+  const byCreatedAt = (a: RecurrenceOverride, b: RecurrenceOverride) => {
+      const ca = a.createdAt || '';
+      const cb = b.createdAt || '';
+      return ca.localeCompare(cb);
+  };
+
+  const getOverrideForDate = (recurrenceId: string, dateStr: string): RecurrenceOverride | null => {
+      const singles = recurrenceOverrides
+          .filter(o => o.recurrenceId === recurrenceId && o.scope === 'single' && o.effectiveFrom === dateStr)
+          .sort(byCreatedAt);
+      if (singles.length > 0) return singles[singles.length - 1];
+
+      const candidates = recurrenceOverrides
+          .filter(o => o.recurrenceId === recurrenceId && o.scope === 'from_here' && o.effectiveFrom <= dateStr)
+          .sort((a, b) => {
+              if (a.effectiveFrom === b.effectiveFrom) return byCreatedAt(a, b);
+              return a.effectiveFrom.localeCompare(b.effectiveFrom);
+          });
+      if (candidates.length === 0) return null;
+      return candidates[candidates.length - 1];
+  };
+
+  const applyOverrideToProjection = (
+      baseTx: Transaction,
+      override: RecurrenceOverride | null
+  ): Transaction | null => {
+      if (!override) return baseTx;
+      if (override.deleteFlag) return null;
+
+      const next: Transaction = { ...baseTx };
+
+      if (override.amount !== undefined && override.amount !== null) next.amount = override.amount;
+      if (override.description) next.description = override.description;
+      if (override.category) next.category = override.category;
+      if (override.status) next.status = override.status;
+
+      if (override.targetCardId) {
+          next.cardId = override.targetCardId;
+          next.accountId = undefined;
+          next.type = 'expense';
+          const card = creditCards.find(c => c.id === override.targetCardId);
+          if (card) {
+              next.date = calculateCreditCardDueDate(baseTx.date, card.closingDay, card.dueDay);
+          }
+      } else if (override.targetAccountId) {
+          next.accountId = override.targetAccountId;
+          next.cardId = undefined;
+      }
+
+      return next;
+  };
+
+  // DEBUG helper: expõe overrides para inspeção no console
+  if (typeof window !== 'undefined') {
+      (window as any).__fluxoOverrides = recurrenceOverrides;
+  }
   
-  recurrences.filter(r => r.active).forEach(r => {
+  // Só projetar recorrências ativas; inativas não geram novas projeções
+  const applicableRecurrences = recurrences.filter(r => r.active);
+
+  applicableRecurrences.forEach(r => {
       const recurrenceStart = new Date(r.startFrom);
       const endLimit = r.endDate ? new Date(r.endDate + 'T00:00:00') : null;
       const maxOccurrences = r.occurrenceCount || null;
@@ -174,7 +235,7 @@ export const calculateTimeline = (
                   );
 
                   if (!alreadyExists) {
-                      projectedRecurrences.push({
+                      const baseTx: Transaction = {
                           id: `proj-daily-${r.id}-${dateStr}`,
                           description: r.description,
                           amount: r.amount,
@@ -184,8 +245,18 @@ export const calculateTimeline = (
                           status: 'pending',
                           accountId: r.targetAccountId,
                           cardId: r.targetCardId,
-                          isProjected: true
-                      });
+                          isProjected: true,
+                          originalTransactionId: r.id
+                      };
+
+                      const override = getOverrideForDate(r.id, dateStr);
+                      const finalTx = applyOverrideToProjection(baseTx, override);
+                      if (finalTx && override && typeof window !== 'undefined') {
+                          console.log('[override-applied]', { recurrenceId: r.id, date: dateStr, override });
+                      }
+                      if (finalTx) {
+                          projectedRecurrences.push(finalTx);
+                      }
                   }
               }
               occurrences++;
@@ -226,7 +297,7 @@ export const calculateTimeline = (
                   );
 
                   if (!alreadyExists) {
-                      projectedRecurrences.push({
+                      const baseTx: Transaction = {
                           id: `proj-monthly-${r.id}-${effectiveDateStr}`,
                           description: r.description,
                           amount: r.amount,
@@ -236,8 +307,18 @@ export const calculateTimeline = (
                           status: 'pending',
                           accountId: r.targetAccountId,
                           cardId: r.targetCardId,
-                          isProjected: true
-                      });
+                          isProjected: true,
+                          originalTransactionId: r.id
+                      };
+
+                      const override = getOverrideForDate(r.id, effectiveDateStr);
+                      const finalTx = applyOverrideToProjection(baseTx, override);
+                      if (finalTx && override && typeof window !== 'undefined') {
+                          console.log('[override-applied]', { recurrenceId: r.id, date: effectiveDateStr, override });
+                      }
+                      if (finalTx) {
+                          projectedRecurrences.push(finalTx);
+                      }
                   }
               }
               occurrences++;

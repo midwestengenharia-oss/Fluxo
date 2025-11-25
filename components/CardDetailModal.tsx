@@ -1,18 +1,19 @@
 ﻿
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { CreditCard, Transaction } from '../types';
+import { CreditCard, Transaction, Recurrence } from '../types';
 import { getCardInvoices, formatCurrency, formatDate, groupDataByCategory } from '../utils/financeUtils';
-import { X, Calendar, ShoppingBag, Wifi, ChevronLeft, ChevronRight, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
+import { X, Calendar, ShoppingBag, Wifi, ChevronLeft, ChevronRight, AlertCircle, CheckCircle2, Clock, RefreshCw } from 'lucide-react';
 import { getColorClasses } from '../styles/tokens';
 
 interface CardDetailModalProps {
     card: CreditCard | null;
     transactions: Transaction[];
+    recurrences: Recurrence[];
     onClose: () => void;
 }
 
-const CardDetailModal: React.FC<CardDetailModalProps> = ({ card, transactions, onClose }) => {
-    const [activeTab, setActiveTab] = useState<'invoice' | 'history'>('invoice');
+const CardDetailModal: React.FC<CardDetailModalProps> = ({ card, transactions, recurrences, onClose }) => {
+    const [activeTab, setActiveTab] = useState<'invoice' | 'history' | 'recurrences'>('invoice');
     const [selectedMonthKey, setSelectedMonthKey] = useState<string | null>(null);
     const invoiceListRef = useRef<HTMLDivElement>(null);
 
@@ -20,6 +21,17 @@ const CardDetailModal: React.FC<CardDetailModalProps> = ({ card, transactions, o
         if (!card) return [];
         return getCardInvoices(card, transactions);
     }, [card, transactions]);
+
+    const cardRecurrences = useMemo(() => {
+        if (!card) return [];
+        return recurrences.filter(r => r.targetCardId === card.id && r.active !== false);
+    }, [card, recurrences]);
+
+    const recurrenceLabel = (r: Recurrence) => {
+        if (r.frequency === 'daily') return 'Todo dia';
+        if (r.dayOfMonth) return `Todo mês no dia ${r.dayOfMonth}`;
+        return 'Mensal';
+    };
 
     // Determine current/open invoice to select by default
     useEffect(() => {
@@ -127,6 +139,12 @@ const CardDetailModal: React.FC<CardDetailModalProps> = ({ card, transactions, o
                             className={`py-4 font-bold text-sm border-b-2 transition-colors ${activeTab === 'history' ? `${colorClasses.border} ${colorClasses.text}` : 'border-transparent text-slate-400 hover:text-slate-600'}`}
                          >
                             Todas as Compras
+                         </button>
+                         <button
+                            onClick={() => setActiveTab('recurrences')}
+                            className={`py-4 font-bold text-sm border-b-2 transition-colors ${activeTab === 'recurrences' ? `${colorClasses.border} ${colorClasses.text}` : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                         >
+                            Recorrências
                          </button>
                     </div>
 
@@ -300,6 +318,46 @@ const CardDetailModal: React.FC<CardDetailModalProps> = ({ card, transactions, o
                                     ))
                                 )}
                              </div>
+                        )}
+
+                        {activeTab === 'recurrences' && (
+                            <div className="p-6 space-y-3 h-full overflow-y-auto custom-scrollbar">
+                                {cardRecurrences.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center h-full text-slate-400 opacity-60">
+                                        <RefreshCw size={48} className="mb-4"/>
+                                        <p>Nenhuma recorrência vinculada a este cartão.</p>
+                                    </div>
+                                ) : (
+                                    [...cardRecurrences]
+                                        .sort((a, b) => {
+                                            if (a.frequency === 'daily' && b.frequency !== 'daily') return -1;
+                                            if (b.frequency === 'daily' && a.frequency !== 'daily') return 1;
+                                            return (a.dayOfMonth ?? 31) - (b.dayOfMonth ?? 31);
+                                        })
+                                        .map(rec => (
+                                            <div
+                                                key={rec.id}
+                                                className="flex items-center justify-between p-4 bg-white hover:bg-slate-50 rounded-xl border border-slate-100 hover:border-slate-200 transition-all shadow-sm"
+                                            >
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                                                        <RefreshCw size={18} />
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-slate-700">{rec.description}</p>
+                                                        <p className="text-[11px] text-slate-500">
+                                                            {recurrenceLabel(rec)} • {rec.category}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="font-mono font-bold text-slate-800">{formatCurrency(rec.amount)}</p>
+                                                    <p className="text-[10px] text-slate-400">Tipo: {rec.type}</p>
+                                                </div>
+                                            </div>
+                                        ))
+                                )}
+                            </div>
                         )}
                     </div>
                 </div>
