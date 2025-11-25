@@ -5,7 +5,7 @@ module.exports = {
     './index.tsx',
     './App.{ts,tsx,jsx,js}',
     './components/**/*.{ts,tsx,jsx,js}',
-    './styles/**/*.{css,scss}',
+    './styles/**/*.{css,scss,ts}',
     './utils/**/*.{ts,tsx,jsx,js}',
     './types.ts'
   ],

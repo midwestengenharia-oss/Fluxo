@@ -104,125 +104,232 @@ const Dashboard: React.FC<DashboardProps> = ({ timeline, accounts, settings, tra
 
       {/* Top level KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card variant="gradient" className="relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/20 via-cyan-500/15 to-transparent pointer-events-none" />
-          <div className="relative z-10">
-            <CardHeader
-              icon={<Wallet size={20} />}
-              iconBg="bg-white/10 text-emerald-200"
-              title="Saldo em Conta"
-              subtitle="Liquidez imediata"
-            />
-            <CardStat label="" value={formatCurrency(liquidBalance)} />
-          </div>
-        </Card>
+        {/* Liquidez */}
+        <div className="relative overflow-hidden bg-white/95 backdrop-blur-sm rounded-2xl p-6 border border-emerald-600/20 shadow-[0_8px_30px_-8px_rgba(5,150,105,0.15)] transition-all duration-300 hover:shadow-[0_20px_50px_-12px_rgba(5,150,105,0.25)] hover:-translate-y-1">
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/50 to-transparent pointer-events-none"></div>
+          <div className="absolute -top-20 -right-20 w-40 h-40 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
-        <Card variant="dark" className="relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500 rounded-full blur-3xl -mr-10 -mt-10 opacity-20"></div>
           <div className="relative z-10">
-            <CardHeader
-              icon={<Activity size={20} />}
-              iconBg="bg-white/10 text-indigo-300"
-              title="Patrimônio Líquido"
-            />
-            <div>
-              <p className="text-3xl font-bold text-white font-mono tracking-tight">{formatCurrency(totalNetWorth)}</p>
-              <p className="text-xs text-slate-400 mt-1">Saldo + Investimentos</p>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2.5 bg-emerald-100 rounded-xl shadow-sm">
+                <Wallet size={18} className="text-emerald-700" />
+              </div>
+              <div className="flex-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700/70">Liquidez</span>
+              </div>
+            </div>
+            <p className="text-3xl font-bold tracking-tight font-mono text-slate-800 mb-1">{formatCurrency(liquidBalance)}</p>
+            <p className="text-xs text-slate-400">Disponível em contas</p>
+          </div>
+        </div>
+
+        {/* Patrimônio */}
+        <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-900 rounded-2xl p-6 border border-white/10 shadow-[0_8px_30px_-8px_rgba(15,23,42,0.4)] transition-all duration-300 hover:shadow-[0_20px_50px_-12px_rgba(99,102,241,0.4)] hover:-translate-y-1">
+          <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.03] pointer-events-none"></div>
+          <div className="absolute -top-20 -right-20 w-40 h-40 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none"></div>
+
+          <div className="relative z-10">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-xl shadow-sm">
+                <Activity size={18} className="text-white" />
+              </div>
+              <div className="flex-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-white/70">Patrimônio</span>
+              </div>
+            </div>
+            <p className="text-3xl font-bold tracking-tight font-mono text-white mb-1">{formatCurrency(totalNetWorth)}</p>
+            <p className="text-xs text-white/50">Saldo + Investimentos</p>
+          </div>
+        </div>
+
+        {/* Projeção */}
+        <div className="relative overflow-hidden bg-white/95 backdrop-blur-sm rounded-2xl p-6 border border-blue-600/20 shadow-[0_8px_30px_-8px_rgba(37,99,235,0.15)] transition-all duration-300 hover:shadow-[0_20px_50px_-12px_rgba(37,99,235,0.25)] hover:-translate-y-1">
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 to-transparent pointer-events-none"></div>
+          <div className="absolute -top-20 -right-20 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+          <div className="relative z-10">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2.5 bg-blue-100 rounded-xl shadow-sm">
+                <TrendingUp size={18} className="text-blue-700" />
+              </div>
+              <div className="flex-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700/70">Projeção 30d</span>
+              </div>
+            </div>
+            <p className={`text-3xl font-bold tracking-tight font-mono mb-1 ${endOfMonth >= currentBalance ? 'text-emerald-600' : 'text-rose-600'}`}>
+              {formatCurrency(endOfMonth)}
+            </p>
+            <p className="text-xs text-slate-400">Variação: {formatCurrency(endOfMonth - currentBalance)}</p>
+          </div>
+        </div>
+
+        {/* Burn/Savings */}
+        <div className="relative overflow-hidden bg-white/95 backdrop-blur-sm rounded-2xl p-6 border border-amber-600/20 shadow-[0_8px_30px_-8px_rgba(245,158,11,0.15)] transition-all duration-300 hover:shadow-[0_20px_50px_-12px_rgba(245,158,11,0.25)] hover:-translate-y-1">
+          <div className="absolute inset-0 bg-gradient-to-br from-amber-50/50 to-transparent pointer-events-none"></div>
+          <div className="absolute -top-20 -right-20 w-40 h-40 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+          <div className="relative z-10">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2.5 bg-amber-100 rounded-xl shadow-sm">
+                <Flame size={18} className="text-amber-700" />
+              </div>
+              <div className="flex-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700/70">Velocidade</span>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-500">Burn Rate</span>
+                <span className="text-lg font-bold text-rose-600">{(burnRate * 100).toFixed(1)}%</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-500">Savings</span>
+                <span className="text-lg font-bold text-emerald-600">{savingsRate.toFixed(1)}%</span>
+              </div>
             </div>
           </div>
-        </Card>
-
-        <Card variant="elevated">
-          <CardHeader
-            icon={<TrendingUp size={20} />}
-            iconBg="bg-emerald-50 text-emerald-600"
-            title="Projeção (30d)"
-            subtitle="Saldo previsto"
-          />
-          <CardStat
-            label=""
-            value={formatCurrency(endOfMonth)}
-            sublabel={`Variação: ${formatCurrency(endOfMonth - currentBalance)}`}
-            valueColor={endOfMonth >= currentBalance ? 'text-emerald-600' : 'text-rose-600'}
-          />
-        </Card>
-
-        <Card variant="elevated">
-          <CardHeader
-            icon={<Flame size={20} />}
-            iconBg="bg-amber-50 text-amber-600"
-            title="Burn / Savings"
-            subtitle="Velocidade de caixa"
-          />
-          <div className="space-y-2">
-            <p className="text-lg font-bold text-slate-800">Burn: {(burnRate * 100).toFixed(1)}%</p>
-            <p className="text-sm text-emerald-600 font-bold">Savings: {savingsRate.toFixed(1)}%</p>
-          </div>
-        </Card>
+        </div>
       </div>
 
       {/* Chart + Insights */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card variant="elevated" padding="lg" className="lg:col-span-2">
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h3 className="font-bold text-slate-800 text-lg">Evolução Semestral</h3>
-              <p className="text-slate-400 text-sm">Entradas x Saídas x Saldo</p>
+        {/* Evolução Mensal - Redesenhada */}
+        <div className="lg:col-span-2 relative overflow-hidden bg-white/95 backdrop-blur-sm rounded-2xl p-8 border border-indigo-600/10 shadow-[0_8px_30px_-8px_rgba(79,70,229,0.12)] transition-all duration-300 hover:shadow-[0_20px_50px_-12px_rgba(79,70,229,0.2)]">
+          <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/30 to-transparent pointer-events-none"></div>
+          <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none"></div>
+
+          <div className="relative z-10">
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <h3 className="text-xl font-bold text-slate-800 mb-1">Evolução Mensal</h3>
+                <p className="text-sm text-slate-500">Últimos 6 meses - Entradas, Saídas e Saldo</p>
+              </div>
+              <div className="flex gap-4 text-[11px] font-bold">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 bg-emerald-500 rounded-full shadow-sm"></div>
+                  <span className="text-slate-600">Entradas</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 bg-rose-500 rounded-full shadow-sm"></div>
+                  <span className="text-slate-600">Saídas</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 bg-indigo-600 rounded-full shadow-sm"></div>
+                  <span className="text-slate-600">Saldo</span>
+                </div>
+              </div>
             </div>
-            <div className="flex gap-3 text-xs font-bold text-slate-500">
-              <div className="flex items-center gap-1"><div className="w-2 h-2 bg-emerald-400 rounded-full"></div> Entradas</div>
-              <div className="flex items-center gap-1"><div className="w-2 h-2 bg-rose-400 rounded-full"></div> Saídas</div>
-              <div className="flex items-center gap-1"><div className="w-2 h-2 bg-indigo-600 rounded-full"></div> Saldo</div>
+
+            <div className="h-80 -mx-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={monthlyChartData} margin={{top: 10, right: 20, left: 0, bottom: 5}}>
+                  <defs>
+                    <linearGradient id="incomeGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#10b981" stopOpacity={0.3}/>
+                      <stop offset="100%" stopColor="#10b981" stopOpacity={0.05}/>
+                    </linearGradient>
+                    <linearGradient id="expenseGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#f43f5e" stopOpacity={0.3}/>
+                      <stop offset="100%" stopColor="#f43f5e" stopOpacity={0.05}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.5} />
+                  <XAxis
+                    dataKey="monthName"
+                    tick={{fontSize: 12, fill: '#64748b', fontWeight: 600}}
+                    axisLine={{stroke: '#e2e8f0'}}
+                    tickLine={false}
+                    dy={8}
+                  />
+                  <YAxis
+                    tick={{fontSize: 11, fill: '#94a3b8', fontWeight: 500}}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(val) => `${val >= 0 ? '' : '-'}R$${Math.abs(val/1000).toFixed(0)}k`}
+                    dx={-5}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: '16px',
+                      border: 'none',
+                      backgroundColor: 'rgba(255,255,255,0.98)',
+                      backdropFilter: 'blur(8px)',
+                      boxShadow: '0 20px 40px -15px rgba(0,0,0,0.15)',
+                      padding: '12px 16px'
+                    }}
+                    labelStyle={{fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '6px'}}
+                    itemStyle={{fontSize: '13px', fontWeight: 600, padding: '2px 0'}}
+                    formatter={(val: number) => formatCurrency(val)}
+                  />
+                  <Bar dataKey="income" fill="url(#incomeGradient)" barSize={24} radius={[8,8,0,0]} />
+                  <Bar dataKey="expense" fill="url(#expenseGradient)" barSize={24} radius={[8,8,0,0]} />
+                  <Line
+                    type="monotone"
+                    dataKey="balance"
+                    stroke="#4f46e5"
+                    strokeWidth={3.5}
+                    dot={{r: 5, fill: '#4f46e5', strokeWidth: 3, stroke: '#fff'}}
+                    activeDot={{r: 7, fill: '#4f46e5', strokeWidth: 3, stroke: '#fff', filter: 'drop-shadow(0 4px 8px rgba(79,70,229,0.4))'}}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
             </div>
           </div>
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={monthlyChartData} margin={{top: 10, right: 10, left: -10, bottom: 0}}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="monthName" tick={{fontSize: 12, fill: '#94a3b8'}} axisLine={false} tickLine={false} dy={10} />
-                <YAxis tick={{fontSize: 10, fill: '#94a3b8'}} axisLine={false} tickLine={false} tickFormatter={(val) => `R$${val/1000}k`}/>
-                <Tooltip
-                  contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 30px -10px rgba(0,0,0,0.1)'}}
-                  formatter={(val: number) => formatCurrency(val)}
-                />
-                <Bar dataKey="income" fill="#34d399" barSize={14} radius={[6,6,0,0]} stackId="a" />
-                <Bar dataKey="expense" fill="#fb7185" barSize={14} radius={[6,6,0,0]} stackId="a" />
-                <Line type="monotone" dataKey="balance" stroke="#4f46e5" strokeWidth={3} dot={{r: 4, fill: '#4f46e5', strokeWidth: 2, stroke: '#fff'}} />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
+        </div>
 
         <div className="flex flex-col gap-6">
-          <Card variant="elevated" className="flex-1 flex flex-col justify-center">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="p-2 bg-amber-100 text-amber-600 rounded-lg"><Clock size={20}/></div>
-              <h4 className="font-bold text-slate-700 text-sm uppercase">Runway</h4>
-            </div>
-            <p className="text-3xl font-bold text-slate-800 font-mono">{runwayMonths > 24 ? '> 2 Anos' : `${runwayMonths.toFixed(1)} Meses`}</p>
-            <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-              Tempo estimado considerando média de gastos de <strong className="text-slate-600">{formatCurrency(avgMonthlyExpense)}</strong>/mês.
-            </p>
-          </Card>
+          {/* Runway Card */}
+          <div className="flex-1 relative overflow-hidden bg-white/95 backdrop-blur-sm rounded-2xl p-6 border border-amber-600/20 shadow-[0_8px_30px_-8px_rgba(245,158,11,0.15)] transition-all duration-300 hover:shadow-[0_20px_50px_-12px_rgba(245,158,11,0.25)]">
+            <div className="absolute inset-0 bg-gradient-to-br from-amber-50/50 to-transparent pointer-events-none"></div>
+            <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
-          <Card variant="elevated" className="flex-1 flex flex-col justify-center">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="p-2 bg-rose-100 text-rose-600 rounded-lg"><AlertTriangle size={20}/></div>
-              <h4 className="font-bold text-slate-700 text-sm uppercase">Maior Ofensor</h4>
-            </div>
-            {biggestExpenseCategory ? (
-              <>
-                <p className="text-xl font-bold text-slate-800">{biggestExpenseCategory.name}</p>
-                <p className="text-rose-600 font-bold font-mono">{formatCurrency(biggestExpenseCategory.value)}</p>
-                <div className="w-full bg-slate-100 h-2 rounded-full mt-3 overflow-hidden">
-                  <div className="h-full bg-rose-500 transition-all duration-500" style={{width: `${Math.min((biggestExpenseCategory.value / totalExpense)*100, 100)}%`}}></div>
+            <div className="relative z-10">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2.5 bg-amber-100 rounded-xl shadow-sm">
+                  <Clock size={18} className="text-amber-700"/>
                 </div>
-                <p className="text-xs text-slate-400 mt-2">Representa {((biggestExpenseCategory.value / totalExpense)*100).toFixed(1)}% das saídas projetadas.</p>
-              </>
-            ) : (
-              <p className="text-slate-400 text-sm">Sem dados suficientes.</p>
-            )}
-          </Card>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700/70">Runway</span>
+              </div>
+              <p className="text-3xl font-bold text-slate-800 font-mono mb-2">
+                {runwayMonths > 24 ? '> 2 Anos' : `${runwayMonths.toFixed(1)} Meses`}
+              </p>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Com média de <strong className="text-slate-700">{formatCurrency(avgMonthlyExpense)}</strong> por mês
+              </p>
+            </div>
+          </div>
+
+          {/* Maior Ofensor Card */}
+          <div className="flex-1 relative overflow-hidden bg-white/95 backdrop-blur-sm rounded-2xl p-6 border border-rose-600/20 shadow-[0_8px_30px_-8px_rgba(244,63,94,0.15)] transition-all duration-300 hover:shadow-[0_20px_50px_-12px_rgba(244,63,94,0.25)]">
+            <div className="absolute inset-0 bg-gradient-to-br from-rose-50/50 to-transparent pointer-events-none"></div>
+            <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-rose-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+            <div className="relative z-10">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2.5 bg-rose-100 rounded-xl shadow-sm">
+                  <AlertTriangle size={18} className="text-rose-700"/>
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-rose-700/70">Maior Ofensor</span>
+              </div>
+              {biggestExpenseCategory ? (
+                <>
+                  <p className="text-xl font-bold text-slate-800 mb-1">{biggestExpenseCategory.name}</p>
+                  <p className="text-rose-600 font-bold font-mono text-lg mb-3">{formatCurrency(biggestExpenseCategory.value)}</p>
+                  <div className="w-full bg-rose-100/50 h-2.5 rounded-full overflow-hidden shadow-inner">
+                    <div
+                      className="h-full bg-gradient-to-r from-rose-500 to-rose-600 transition-all duration-500 shadow-sm"
+                      style={{width: `${Math.min((biggestExpenseCategory.value / totalExpense)*100, 100)}%`}}
+                    ></div>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-2.5">
+                    <strong className="text-slate-700">{((biggestExpenseCategory.value / totalExpense)*100).toFixed(1)}%</strong> das saídas do mês
+                  </p>
+                </>
+              ) : (
+                <p className="text-slate-400 text-sm">Sem dados suficientes.</p>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 

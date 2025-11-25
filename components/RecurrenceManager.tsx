@@ -1,8 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Recurrence, UserSettings, Account, CreditCard } from '../types';
 import { formatCurrency } from '../utils/financeUtils';
-import { Plus, Trash2, Edit2, RefreshCw, Sparkles, Calendar } from 'lucide-react';
+import { Plus, Trash2, Edit2, RefreshCw, Sparkles, Calendar, ArrowUpRight, ArrowDownRight, Repeat, TrendingUp } from 'lucide-react';
 import RecurrenceModal from './RecurrenceModal';
 import Card from './ui/Card';
 import Button from './ui/Button';
@@ -55,13 +55,114 @@ const RecurrenceManager: React.FC<RecurrenceManagerProps> = ({
     return a.dayOfMonth - b.dayOfMonth;
   });
 
+  // Calcular totais mensais por tipo
+  const monthlyTotals = useMemo(() => {
+    return activeRecurrences.reduce((acc, rec) => {
+      const monthly = rec.frequency === 'daily' ? rec.amount * 30 : rec.amount;
+
+      switch(rec.type) {
+        case 'income':
+          acc.income += monthly;
+          break;
+        case 'expense':
+          acc.expense += monthly;
+          break;
+        case 'daily':
+          acc.daily += monthly;
+          break;
+        case 'economy':
+          acc.economy += monthly;
+          break;
+      }
+      return acc;
+    }, { income: 0, expense: 0, daily: 0, economy: 0 });
+  }, [activeRecurrences]);
+
+  const totalInflow = monthlyTotals.income;
+  const totalOutflow = monthlyTotals.expense + monthlyTotals.daily + monthlyTotals.economy;
+  const netMonthly = totalInflow - totalOutflow;
+  const totalRules = activeRecurrences.length;
+
   return (
     <div className="space-y-6 pb-24 max-w-6xl mx-auto animate-in fade-in duration-500">
 
+      {/* Cards Resumo */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        {/* Total de Regras */}
+        <div className="relative overflow-hidden bg-white/95 backdrop-blur-sm rounded-2xl p-6 border border-indigo-600/20 shadow-[0_8px_30px_-8px_rgba(79,70,229,0.15)] transition-all duration-300 hover:shadow-[0_20px_50px_-12px_rgba(79,70,229,0.25)] hover:-translate-y-1">
+          <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/50 to-transparent pointer-events-none"></div>
+          <div className="absolute -top-20 -right-20 w-40 h-40 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+          <div className="relative z-10">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2.5 bg-indigo-100 rounded-xl shadow-sm">
+                <Repeat size={18} className="text-indigo-700" />
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700/70">Regras Ativas</span>
+            </div>
+            <p className="text-3xl font-bold tracking-tight font-mono text-slate-800 mb-1">{totalRules}</p>
+            <p className="text-xs text-slate-400">Automatizações configuradas</p>
+          </div>
+        </div>
+
+        {/* Entradas Mensais */}
+        <div className="relative overflow-hidden bg-white/95 backdrop-blur-sm rounded-2xl p-6 border border-emerald-600/20 shadow-[0_8px_30px_-8px_rgba(5,150,105,0.15)] transition-all duration-300 hover:shadow-[0_20px_50px_-12px_rgba(5,150,105,0.25)] hover:-translate-y-1">
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/50 to-transparent pointer-events-none"></div>
+          <div className="absolute -top-20 -right-20 w-40 h-40 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+          <div className="relative z-10">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2.5 bg-emerald-100 rounded-xl shadow-sm">
+                <ArrowUpRight size={18} className="text-emerald-700" />
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700/70">Entradas/Mês</span>
+            </div>
+            <p className="text-3xl font-bold tracking-tight font-mono text-emerald-600 mb-1">{formatCurrency(totalInflow)}</p>
+            <p className="text-xs text-slate-400">Receitas automáticas</p>
+          </div>
+        </div>
+
+        {/* Saídas Mensais */}
+        <div className="relative overflow-hidden bg-white/95 backdrop-blur-sm rounded-2xl p-6 border border-rose-600/20 shadow-[0_8px_30px_-8px_rgba(244,63,94,0.15)] transition-all duration-300 hover:shadow-[0_20px_50px_-12px_rgba(244,63,94,0.25)] hover:-translate-y-1">
+          <div className="absolute inset-0 bg-gradient-to-br from-rose-50/50 to-transparent pointer-events-none"></div>
+          <div className="absolute -top-20 -right-20 w-40 h-40 bg-rose-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+          <div className="relative z-10">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2.5 bg-rose-100 rounded-xl shadow-sm">
+                <ArrowDownRight size={18} className="text-rose-700" />
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-rose-700/70">Saídas/Mês</span>
+            </div>
+            <p className="text-3xl font-bold tracking-tight font-mono text-rose-600 mb-1">{formatCurrency(totalOutflow)}</p>
+            <p className="text-xs text-slate-400">Despesas automáticas</p>
+          </div>
+        </div>
+
+        {/* Impacto Líquido */}
+        <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-900 rounded-2xl p-6 border border-white/10 shadow-[0_8px_30px_-8px_rgba(15,23,42,0.4)] transition-all duration-300 hover:shadow-[0_20px_50px_-12px_rgba(99,102,241,0.4)] hover:-translate-y-1">
+          <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.03] pointer-events-none"></div>
+          <div className="absolute -top-20 -right-20 w-40 h-40 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none"></div>
+
+          <div className="relative z-10">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-xl shadow-sm">
+                <TrendingUp size={18} className="text-white" />
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-white/70">Impacto Mensal</span>
+            </div>
+            <p className={`text-3xl font-bold tracking-tight font-mono mb-1 ${netMonthly >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {formatCurrency(netMonthly)}
+            </p>
+            <p className="text-xs text-white/50">{netMonthly >= 0 ? 'Positivo' : 'Negativo'} no fluxo de caixa</p>
+          </div>
+        </div>
+      </div>
+
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-xl font-bold text-slate-800">Regras Recorrentes</h3>
-          <p className="text-slate-500 text-sm">Automatize entradas, saídas e investimentos.</p>
+          <h3 className="text-xl font-bold text-slate-800">Regras Configuradas</h3>
+          <p className="text-slate-500 text-sm">Gerencie suas automatizações financeiras</p>
         </div>
         <Button
           variant="primary"
@@ -147,6 +248,7 @@ const RecurrenceManager: React.FC<RecurrenceManagerProps> = ({
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSave={handleSave}
+        onDelete={onDeleteRecurrence}
         recurrenceToEdit={recurrenceToEdit}
         customCategories={customCategories}
         onAddCategory={onAddCategory}
