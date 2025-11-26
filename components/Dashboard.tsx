@@ -344,7 +344,7 @@ const Dashboard: React.FC<DashboardProps> = ({ timeline, accounts, transactions 
               <div className="flex-1">
                 <span className={`text-[10px] font-bold uppercase tracking-wider ${
                   projectionDelta >= 0 ? 'text-emerald-700/70' : 'text-rose-700/70'
-                }`}>Projeção 30d</span>
+                }`}>Projeção 30 Dias</span>
               </div>
             </div>
             <p className={`text-3xl font-bold tracking-tight font-mono mb-1 ${
