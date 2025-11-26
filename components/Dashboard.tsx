@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { TrendingUp, Wallet, Activity, Clock, Target, Flame, ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight, CheckCircle2, BarChart3, PiggyBank, Percent, TrendingDown } from 'lucide-react';
 import { DailyBalance, Account, UserSettings, Transaction } from '../types';
-import { formatCurrency, groupDataByCategory, groupDailyToMonthly } from '../utils/financeUtils';
+import { formatCurrency, groupDataByCategory, groupDailyToMonthly, getLocalDateString } from '../utils/financeUtils';
 import { ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import Card, { CardHeader } from './ui/Card';
 
@@ -69,7 +69,7 @@ const Dashboard: React.FC<DashboardProps> = ({ timeline, accounts, transactions 
     });
   };
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getLocalDateString();
 
   const calculateRealBalance = (account: Account) => {
     const accountTransactions = transactions.filter(t =>
@@ -121,11 +121,15 @@ const Dashboard: React.FC<DashboardProps> = ({ timeline, accounts, transactions 
     }));
   }, [timeline]);
 
-  const formatMonthKeyLabel = (key: string) =>
-    new Intl.DateTimeFormat('pt-BR', { month: 'short', year: 'numeric' })
-      .format(new Date(key + '-02'))
+  const formatMonthKeyLabel = (key: string) => {
+    const date = new Date(key + '-02');
+    const month = new Intl.DateTimeFormat('pt-BR', { month: 'short' })
+      .format(date)
       .replace('.', '')
-      .replace(' de ', ' ');
+      .toUpperCase();
+    const year = date.getFullYear().toString().slice(-2);
+    return `${month} ${year}`;
+  };
 
   const chartIndex = useMemo(() => {
     let idx = monthlyData.findIndex(m => m.name === chartCursorKey);
@@ -140,7 +144,7 @@ const Dashboard: React.FC<DashboardProps> = ({ timeline, accounts, transactions 
   const startIndex = Math.max(0, chartIndex - 5);
   const monthlyChartData = monthlyData.slice(startIndex, startIndex + 6);
   const rangeLabel = monthlyChartData.length
-    ? `${formatMonthKeyLabel(monthlyChartData[0].name)} — ${formatMonthKeyLabel(monthlyChartData[monthlyChartData.length - 1].name)}`
+    ? `${formatMonthKeyLabel(monthlyChartData[0].name)} - ${formatMonthKeyLabel(monthlyChartData[monthlyChartData.length - 1].name)}`
     : 'Sem dados';
 
   const avgMonthlyExpense = monthlyChartData.reduce((acc, m) => acc + m.expense, 0) / (monthlyChartData.length || 1);
@@ -316,30 +320,42 @@ const Dashboard: React.FC<DashboardProps> = ({ timeline, accounts, transactions 
         </div>
 
         {/* Projecao */}
-        <div className="relative overflow-hidden bg-white/95 backdrop-blur-sm rounded-2xl p-6 border border-blue-600/20 shadow-[0_8px_30px_-8px_rgba(37,99,235,0.15)] transition-all duration-300 hover:shadow-[0_20px_50px_-12px_rgba(37,99,235,0.25)] hover:-translate-y-1">
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 to-transparent pointer-events-none"></div>
-          <div className="absolute -top-20 -right-20 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div className={`relative overflow-hidden bg-white/95 backdrop-blur-sm rounded-2xl p-6 border transition-all duration-300 hover:shadow-[0_20px_50px_-12px_rgba(37,99,235,0.25)] hover:-translate-y-1 ${
+          projectionDelta >= 0 ? 'border-emerald-600/20 shadow-[0_8px_30px_-8px_rgba(16,185,129,0.15)]' : 'border-rose-600/20 shadow-[0_8px_30px_-8px_rgba(244,63,94,0.15)]'
+        }`}>
+          <div className={`absolute inset-0 bg-gradient-to-br to-transparent pointer-events-none ${
+            projectionDelta >= 0 ? 'from-emerald-50/50' : 'from-rose-50/50'
+          }`}></div>
+          <div className={`absolute -top-20 -right-20 w-40 h-40 rounded-full blur-3xl pointer-events-none ${
+            projectionDelta >= 0 ? 'bg-emerald-500/10' : 'bg-rose-500/10'
+          }`}></div>
 
           <div className="relative z-10">
             <div className="flex items-center gap-3 mb-4">
-              <div className="p-2.5 bg-blue-100 rounded-xl shadow-sm">
-                <Target size={18} className="text-blue-700" />
+              <div className={`p-2.5 rounded-xl shadow-sm ${
+                projectionDelta >= 0 ? 'bg-emerald-100' : 'bg-rose-100'
+              }`}>
+                {projectionDelta >= 0 ? (
+                  <TrendingUp size={18} className="text-emerald-700"/>
+                ) : (
+                  <TrendingDown size={18} className="text-rose-700"/>
+                )}
               </div>
               <div className="flex-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700/70">Projecao 30d</span>
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${
+                  projectionDelta >= 0 ? 'text-emerald-700/70' : 'text-rose-700/70'
+                }`}>Projecao 30d</span>
               </div>
             </div>
-            <p className={`text-3xl font-bold tracking-tight font-mono mb-1 ${endOfMonth >= currentBalance ? 'text-emerald-600' : 'text-rose-600'}`}>
+            <p className={`text-3xl font-bold tracking-tight font-mono mb-1 ${
+              projectionDelta >= 0 ? 'text-emerald-600' : 'text-rose-600'
+            }`}>
               {formatCurrency(endOfMonth)}
             </p>
-            <div className="flex items-center gap-2 text-xs text-slate-500">
-              {projectionDelta >= 0 ? (
-                <ArrowUpRight size={14} className="text-emerald-600" />
-              ) : (
-                <ArrowDownRight size={14} className="text-rose-600" />
-              )}
-              <span>Variacao: {formatCurrency(projectionDelta)}</span>
-            </div>
+            <p className="text-xs text-slate-500">
+              {projectionDelta >= 0 ? 'Tendência positiva este mês' : 'Tendência negativa este mês'}
+              {' • Variação: '}{projectionDelta >= 0 ? '+' : ''}{formatCurrency(projectionDelta)}
+            </p>
           </div>
         </div>
       </div>
@@ -624,46 +640,6 @@ const Dashboard: React.FC<DashboardProps> = ({ timeline, accounts, transactions 
                   : executionPace > 0
                     ? `Acima do ritmo esperado para o dia ${currentDay}`
                     : `Abaixo do ritmo esperado para o dia ${currentDay}`}
-              </p>
-            </div>
-          </div>
-
-          {/* Performance M/M */}
-          <div className={`relative overflow-hidden bg-white/95 backdrop-blur-sm rounded-2xl p-6 border transition-all duration-300 hover:shadow-[0_20px_50px_-12px_rgba(244,63,94,0.25)] hover:-translate-y-1 ${
-            netDelta >= 0 ? 'border-emerald-600/20 shadow-[0_8px_30px_-8px_rgba(16,185,129,0.15)]' : 'border-rose-600/20 shadow-[0_8px_30px_-8px_rgba(244,63,94,0.15)]'
-          }`}>
-            <div className={`absolute inset-0 bg-gradient-to-br to-transparent pointer-events-none ${
-              netDelta >= 0 ? 'from-emerald-50/50' : 'from-rose-50/50'
-            }`}></div>
-            <div className={`absolute -top-10 -right-10 w-28 h-28 rounded-full blur-3xl pointer-events-none ${
-              netDelta >= 0 ? 'bg-emerald-500/10' : 'bg-rose-500/10'
-            }`}></div>
-            <div className="relative z-10">
-              <div className="flex items-center gap-3 mb-4">
-                <div className={`p-2.5 rounded-xl shadow-sm ${
-                  netDelta >= 0 ? 'bg-emerald-100' : 'bg-rose-100'
-                }`}>
-                  {netDelta >= 0 ? (
-                    <TrendingUp size={18} className="text-emerald-700"/>
-                  ) : (
-                    <TrendingDown size={18} className="text-rose-700"/>
-                  )}
-                </div>
-                <div className="flex-1 flex items-center justify-between">
-                  <span className={`text-[10px] font-bold uppercase tracking-wider ${
-                    netDelta >= 0 ? 'text-emerald-700/70' : 'text-rose-700/70'
-                  }`}>Performance M/M</span>
-                  <span className="text-[11px] font-semibold text-slate-400">{previousMonthKey} → {monthKeyToday}</span>
-                </div>
-              </div>
-              <p className={`text-3xl font-bold tracking-tight font-mono mb-1 ${
-                netDelta >= 0 ? 'text-emerald-600' : 'text-rose-600'
-              }`}>
-                {netDelta >= 0 ? '+' : ''}{formatCurrency(netDelta)}
-              </p>
-              <p className="text-xs text-slate-500">
-                {netDelta >= 0 ? 'Melhor que o mês anterior' : 'Pior que o mês anterior'}
-                {netDeltaPercent !== null && ` (${netDelta >= 0 ? '+' : ''}${netDeltaPercent.toFixed(0)}%)`}
               </p>
             </div>
           </div>

@@ -1,6 +1,6 @@
 ﻿﻿import React, { useState } from 'react';
 import { Account, CreditCard, Transaction, Recurrence } from '../types';
-import { formatCurrency } from '../utils/financeUtils';
+import { formatCurrency, getLocalDateString } from '../utils/financeUtils';
 import { Plus, CreditCard as CreditCardIcon, Landmark, Wallet, Trash2, Edit2, Wifi, Eye, Briefcase } from 'lucide-react';
 import AccountModal from './AccountModal';
 import CardDetailModal from './CardDetailModal';
@@ -54,19 +54,47 @@ const AccountManager: React.FC<AccountManagerProps> = ({
     setIsModalOpen(true);
   };
 
+  // Calcula saldo REAL atual de cada conta considerando transações efetivadas
+  const calculateRealBalance = (account: Account) => {
+    const today = getLocalDateString();
+
+    // Pega TODAS as transações da conta (removido filtro de status para debug)
+    const accountTransactions = transactions.filter(t =>
+      t.accountId === account.id &&
+      t.date <= today
+    );
+
+    console.log(`[DEBUG] Conta: ${account.name}`);
+    console.log(`[DEBUG] InitialBalance: ${account.initialBalance}`);
+    console.log(`[DEBUG] Total transações encontradas: ${accountTransactions.length}`);
+    console.log(`[DEBUG] Transações:`, accountTransactions);
+
+    const transactionsTotal = accountTransactions.reduce((sum, t) => {
+      if (t.type === 'income') return sum + t.amount;
+      if (t.type === 'expense' || t.type === 'daily' || t.type === 'economy') return sum - t.amount;
+      return sum;
+    }, 0);
+
+    console.log(`[DEBUG] Total de transações: ${transactionsTotal}`);
+    console.log(`[DEBUG] Saldo final: ${account.initialBalance + transactionsTotal}`);
+
+    return account.initialBalance + transactionsTotal;
+  };
+
   // Separating accounts
   const checkingAccounts = accounts.filter(a => a.type !== 'investment');
   const walletAccounts = accounts.filter(a => a.type === 'investment');
 
-  const totalBalance = checkingAccounts.reduce((acc, curr) => acc + curr.initialBalance, 0);
-  const totalInvested = walletAccounts.reduce((acc, curr) => acc + curr.initialBalance, 0);
+  const totalBalance = checkingAccounts.reduce((acc, curr) => acc + calculateRealBalance(curr), 0);
+  const totalInvested = walletAccounts.reduce((acc, curr) => acc + calculateRealBalance(curr), 0);
   const totalCreditLimit = creditCards.reduce((acc, curr) => acc + (curr.limit || 0), 0);
 
   // Account Card Component
   const AccountCard = ({ acc, isInvestment = false }: { acc: Account; isInvestment?: boolean }) => {
     const colorClasses = getColorClasses(acc.color);
     const accountLabel = isInvestment ? 'Carteira de Investimentos' : acc.type === 'checking' ? 'Conta Corrente' : acc.type === 'savings' ? 'Poupança' : 'Dinheiro';
-    const isPositive = acc.initialBalance >= 0;
+    const realBalance = calculateRealBalance(acc);
+    const isPositive = realBalance >= 0;
 
     return (
       <div
@@ -120,7 +148,7 @@ const AccountManager: React.FC<AccountManagerProps> = ({
           <div className={`pt-4 border-t-2 ${colorClasses.border} border-opacity-25`}>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Saldo Atual</p>
             <p className={`text-3xl font-bold font-mono tracking-tight ${isPositive ? 'text-slate-800' : 'text-rose-600'}`}>
-              {formatCurrency(acc.initialBalance)}
+              {formatCurrency(realBalance)}
             </p>
           </div>
         </div>

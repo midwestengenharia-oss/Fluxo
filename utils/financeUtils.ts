@@ -11,6 +11,18 @@ export const generateUUID = () => {
   });
 };
 
+/**
+ * Retorna a data atual no timezone local no formato YYYY-MM-DD
+ * Evita problemas com UTC que podem causar diferença de um dia
+ */
+export const getLocalDateString = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export const formatDate = (dateStr: string) => {
   const date = new Date(dateStr + 'T00:00:00');
   return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' }).format(date);
@@ -66,7 +78,7 @@ export const processCreditCardTransaction = (
     installments: number
 ): Transaction[] => {
     const results: Transaction[] = [];
-    const purchaseDate = baseTransaction.date || new Date().toISOString().split('T')[0];
+    const purchaseDate = baseTransaction.date || getLocalDateString();
     const amountPerInstallment = (baseTransaction.amount || 0) / installments;
     
     let currentDueDateStr = calculateCreditCardDueDate(purchaseDate, card.closingDay, card.dueDay);
@@ -145,11 +157,40 @@ export const calculateTimeline = (
   // but requested to show balance. We sum everything that isn't a future card debt.
   let runningBalance = accounts.filter(a => a.type !== 'investment').reduce((acc, curr) => acc + curr.initialBalance, 0);
   
+  const parseDateSafe = (value: string) => {
+      const d = new Date(value + 'T00:00:00');
+      return Number.isNaN(d.getTime()) ? null : d;
+  };
+
+  const startCandidate = parseDateSafe(startDate) || new Date(startDate);
+
+  const earliestTxDate = manualTransactions.reduce<Date | null>((min, tx) => {
+      const d = parseDateSafe(tx.date);
+      if (!d) return min;
+      if (!min || d < min) return d;
+      return min;
+  }, null);
+
+  const effectiveStart = earliestTxDate && earliestTxDate < startCandidate ? earliestTxDate : startCandidate;
+  const extraDays = Math.max(0, Math.ceil((startCandidate.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24)));
+  const totalDays = daysToProject + extraDays;
+
+  // Apply historical transactions prior to the effective start so the running balance is real
+  const effectiveStartStr = effectiveStart.toISOString().split('T')[0];
+  const pastTransactions = manualTransactions.filter(t => t.date < effectiveStartStr);
+  pastTransactions.forEach(t => {
+      if (t.type === 'income') {
+          runningBalance += t.amount;
+      } else {
+          runningBalance -= t.amount;
+      }
+  });
+  
   const timeline: DailyBalance[] = [];
-  const start = new Date(startDate);
-  const todayStr = new Date().toISOString().split('T')[0];
+  const start = effectiveStart;
+  const todayStr = getLocalDateString();
   const endDate = new Date(start);
-  endDate.setDate(endDate.getDate() + daysToProject);
+  endDate.setDate(endDate.getDate() + totalDays);
 
   const projectedRecurrences: Transaction[] = [];
   const makeUTCDate = (year: number, month: number, day: number) => new Date(Date.UTC(year, month, day));
@@ -469,7 +510,7 @@ export const getCardInvoices = (card: CreditCard, transactions: Transaction[]): 
         invoices[monthKey].transactions.push(t);
     });
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalDateString();
 
     return Object.values(invoices).map(inv => {
         if (inv.dueDate < today) inv.status = 'closed';

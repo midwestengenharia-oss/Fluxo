@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Transaction, TransactionType, Account, CreditCard, UserSettings } from '../types';
+import { getLocalDateString } from '../utils/financeUtils';
 import { Trash2, Check, Hash } from 'lucide-react';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
@@ -105,7 +106,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
       setAmount('');
       setDescription('');
       setCategory('');
-      setDate(initialDate || new Date().toISOString().split('T')[0]);
+      setDate(initialDate || getLocalDateString());
       setStatus('pending');
       setInstallments('1');
       setTargetType('account');

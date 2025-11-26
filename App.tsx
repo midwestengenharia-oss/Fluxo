@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { LayoutDashboard, CalendarDays, PiggyBank, Menu, Settings as SettingsIcon, Plus, Sparkles, CreditCard, RefreshCcw, X, LogOut, Check, Trash2 } from 'lucide-react';
 import { Transaction, Account, CreditCard as CreditCardType, Recurrence, TransactionType, UserSettings, DEFAULT_CATEGORIES, DEFAULT_HEALTH_LEVELS, HealthLevel, RecurrenceOverride } from './types';
-import { calculateTimeline, calculateEconomy, processCreditCardTransaction, generateUUID } from './utils/financeUtils';
+import { calculateTimeline, calculateEconomy, processCreditCardTransaction, generateUUID, getLocalDateString } from './utils/financeUtils';
 import { supabase } from './utils/supabaseClient';
 import Dashboard from './components/Dashboard';
 import CashFlow from './components/CashFlow';
@@ -694,7 +694,7 @@ const App: React.FC = () => {
 
       // Soft delete: desativa e corta projeções futuras, preservando histórico
       try {
-          const todayStr = new Date().toISOString().split('T')[0];
+          const todayStr = getLocalDateString();
           const { data, error } = await supabase
               .from('recurring_rules')
               .update({ active: false, end_date: todayStr })

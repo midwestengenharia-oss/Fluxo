@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { DailyBalance, Transaction, CreditCard, Account, HealthLevel } from '../types';
-import { formatCurrency } from '../utils/financeUtils';
+import { formatCurrency, getLocalDateString } from '../utils/financeUtils';
 import { ChevronLeft, ChevronRight, ArrowDownRight, ArrowUpRight, Wallet, Plus, Calendar, Sparkles, CreditCard as CreditCardIcon, Building2, ExternalLink, Clock, Check, TrendingUp, TrendingDown, Minus, AlertTriangle } from 'lucide-react';
 import Card from './ui/Card';
 import Button from './ui/Button';
@@ -224,7 +224,7 @@ const CashFlow: React.FC<CashFlowProps> = ({ timeline, creditCards, accounts, he
 
   // Saldo do dia atual (hoje)
   const todayBalance = useMemo(() => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalDateString();
     const todayData = displayedDays.find(d => d.date === today);
     return todayData?.endBalance ?? null;
   }, [displayedDays]);
@@ -350,7 +350,7 @@ const CashFlow: React.FC<CashFlowProps> = ({ timeline, creditCards, accounts, he
     }
   }, [healthLevels, todayBalance, healthBarData]);
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getLocalDateString();
 
   // Agrupa transações de cartão por cardId para mostrar separador
   const getCardTransactionGroups = (transactions: Transaction[]) => {
