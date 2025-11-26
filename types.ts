@@ -27,11 +27,12 @@ export interface Transaction {
   id: string;
   description: string;
   amount: number;
-  date: string; // YYYY-MM-DD
+  date: string; // YYYY-MM-DD - Para cartão: data do vencimento da fatura
+  purchaseDate?: string; // YYYY-MM-DD - Para cartão: data real da compra
   type: TransactionType;
   category: string;
   status: TransactionStatus;
-  
+
   // Relacionamentos (Foreign Keys)
   accountId?: string; // Link para conta bancária (se débito/dinheiro)
   cardId?: string;    // Link para cartão de crédito (se crédito)

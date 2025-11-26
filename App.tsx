@@ -56,6 +56,7 @@ const mapTransactionFromDB = (dbTx: any): Transaction => ({
     description: dbTx.description,
     amount: Number(dbTx.amount),
     date: dbTx.date,
+    purchaseDate: dbTx.purchase_date || undefined,
     type: mapTypeFromDB(dbTx.type),
     category: dbTx.category || 'Outros',
     status: dbTx.status ? dbTx.status.toLowerCase() : 'pending',
@@ -485,6 +486,7 @@ const App: React.FC = () => {
                 description: t.description,
                 amount: t.amount,
                 date: t.date,
+                purchase_date: t.purchaseDate || null,
                 type: mapTypeToDB(t.type!),
                 category: t.category,
                 status: targetType === 'card' ? 'PENDING' : t.status?.toUpperCase(),
@@ -508,6 +510,7 @@ const App: React.FC = () => {
                         description: t.description!,
                         amount: t.amount!,
                         date: t.date!,
+                        purchaseDate: t.purchaseDate,
                         type: t.type!,
                         category: t.category!,
                         status: targetType === 'card' ? 'pending' : t.status!,
@@ -526,16 +529,17 @@ const App: React.FC = () => {
                  const card = creditCards.find(c => c.id === targetId);
                  if (!card) throw new Error("Cartão não encontrado");
                  const generated = processCreditCardTransaction({ ...t, cardId: targetId }, card, installments);
-                 
+
                  dbPayloads = generated.map(g => ({
                     user_id: user.id,
                     description: g.description,
                     amount: g.amount,
                     date: g.date,
+                    purchase_date: g.purchaseDate || null,
                     type: mapTypeToDB(g.type),
                     category: g.category,
                     status: 'PENDING',
-                    card_id: targetId, 
+                    card_id: targetId,
                     installment_current: g.installmentCurrent,
                     installment_total: g.installmentTotal,
                     original_transaction_id: batchId
@@ -546,6 +550,7 @@ const App: React.FC = () => {
                     description: t.description,
                     amount: t.amount,
                     date: t.date,
+                    purchase_date: null, // Transações de conta não têm data de compra
                     type: mapTypeToDB(t.type!),
                     category: t.category,
                     status: t.status?.toUpperCase(),
@@ -1008,6 +1013,7 @@ const App: React.FC = () => {
               accounts={accounts}
               settings={settings}
               transactions={allTransactions}
+              creditCards={creditCards}
             />
           )}
           {activeTab === 'flow' &&

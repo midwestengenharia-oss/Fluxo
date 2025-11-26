@@ -78,9 +78,9 @@ export const processCreditCardTransaction = (
     installments: number
 ): Transaction[] => {
     const results: Transaction[] = [];
-    const purchaseDate = baseTransaction.date || getLocalDateString();
+    const purchaseDate = baseTransaction.purchaseDate || baseTransaction.date || getLocalDateString();
     const amountPerInstallment = (baseTransaction.amount || 0) / installments;
-    
+
     let currentDueDateStr = calculateCreditCardDueDate(purchaseDate, card.closingDay, card.dueDay);
 
     for (let i = 0; i < installments; i++) {
@@ -92,20 +92,21 @@ export const processCreditCardTransaction = (
         const dateStr = tDate.toISOString().split('T')[0];
 
         results.push({
-            id: generateUUID(), 
-            description: installments > 1 
-                ? `${baseTransaction.description} (${i + 1}/${installments})` 
+            id: generateUUID(),
+            description: installments > 1
+                ? `${baseTransaction.description} (${i + 1}/${installments})`
                 : baseTransaction.description || '',
             amount: amountPerInstallment,
-            date: dateStr,
-            type: 'expense', 
+            date: dateStr, // Data do vencimento da fatura
+            purchaseDate: purchaseDate, // Data real da compra
+            type: 'expense',
             category: baseTransaction.category || 'Outros',
             status: 'pending',
-            cardId: card.id, 
+            cardId: card.id,
             isSimulation: baseTransaction.isSimulation,
             installmentCurrent: i + 1,
             installmentTotal: installments,
-            originalTransactionId: baseTransaction.id 
+            originalTransactionId: baseTransaction.id
         });
     }
 
@@ -188,7 +189,6 @@ export const calculateTimeline = (
   
   const timeline: DailyBalance[] = [];
   const start = effectiveStart;
-  const todayStr = getLocalDateString();
   const endDate = new Date(start);
   endDate.setDate(endDate.getDate() + totalDays);
 
@@ -267,37 +267,35 @@ export const calculateTimeline = (
               if (endLimit && cursor > endLimit) break;
               if (maxOccurrences && occurrences >= maxOccurrences) break;
               const dateStr = cursor.toISOString().split('T')[0];
-              if (dateStr >= todayStr) {
-                  // Verificar se já existe uma transação real para este dia/descrição/valor
-                  const alreadyExists = manualTransactions.some(t =>
-                      t.date === dateStr &&
-                      t.description === r.description &&
-                      Math.abs(t.amount - r.amount) < 0.1
-                  );
+              // Verificar se já existe uma transação real para este dia/descrição/valor
+              const alreadyExists = manualTransactions.some(t =>
+                  t.date === dateStr &&
+                  t.description === r.description &&
+                  Math.abs(t.amount - r.amount) < 0.1
+              );
 
-                  if (!alreadyExists) {
-                      const baseTx: Transaction = {
-                          id: `proj-daily-${r.id}-${dateStr}`,
-                          description: r.description,
-                          amount: r.amount,
-                          date: dateStr,
-                          type: r.type,
-                          category: r.category,
-                          status: 'pending',
-                          accountId: r.targetAccountId,
-                          cardId: r.targetCardId,
-                          isProjected: true,
-                          originalTransactionId: r.id
-                      };
+              if (!alreadyExists) {
+                  const baseTx: Transaction = {
+                      id: `proj-daily-${r.id}-${dateStr}`,
+                      description: r.description,
+                      amount: r.amount,
+                      date: dateStr,
+                      type: r.type,
+                      category: r.category,
+                      status: 'pending',
+                      accountId: r.targetAccountId,
+                      cardId: r.targetCardId,
+                      isProjected: true,
+                      originalTransactionId: r.id
+                  };
 
-                      const override = getOverrideForDate(r.id, dateStr);
-                      const finalTx = applyOverrideToProjection(baseTx, override);
-                      if (finalTx && override && typeof window !== 'undefined') {
-                          console.log('[override-applied]', { recurrenceId: r.id, date: dateStr, override });
-                      }
-                      if (finalTx) {
-                          projectedRecurrences.push(finalTx);
-                      }
+                  const override = getOverrideForDate(r.id, dateStr);
+                  const finalTx = applyOverrideToProjection(baseTx, override);
+                  if (finalTx && override && typeof window !== 'undefined') {
+                      console.log('[override-applied]', { recurrenceId: r.id, date: dateStr, override });
+                  }
+                  if (finalTx) {
+                      projectedRecurrences.push(finalTx);
                   }
               }
               occurrences++;
@@ -318,8 +316,8 @@ export const calculateTimeline = (
               if (maxOccurrences && occurrences >= maxOccurrences) break;
               const purchaseDateStr = cursor.toISOString().split('T')[0];
               
-              // Only project if date is >= today OR startFrom
-              if (purchaseDateStr >= todayStr && purchaseDateStr >= r.startFrom) {
+              // Only project if date is on/after the recurrence start
+              if (purchaseDateStr >= r.startFrom) {
                   let effectiveDateStr = purchaseDateStr;
                   let effectiveType = r.type;
 

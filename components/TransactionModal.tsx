@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Transaction, TransactionType, Account, CreditCard, UserSettings } from '../types';
-import { getLocalDateString } from '../utils/financeUtils';
+import { getLocalDateString, calculateCreditCardDueDate } from '../utils/financeUtils';
 import { Trash2, Check, Hash } from 'lucide-react';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
@@ -48,6 +48,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
   const [date, setDate] = useState('');
+  const [purchaseDate, setPurchaseDate] = useState('');
   const [status, setStatus] = useState<'pending' | 'paid'>('pending');
   const [installments, setInstallments] = useState('1');
   const [showAddCategory, setShowAddCategory] = useState(false);
@@ -85,6 +86,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
       setDescription(transactionToEdit.description);
       setCategory(transactionToEdit.category);
       setDate(transactionToEdit.date);
+      setPurchaseDate(transactionToEdit.purchaseDate || '');
       setStatus(transactionToEdit.status as 'pending' | 'paid');
       setInstallments((transactionToEdit.installmentTotal || 1).toString());
 
@@ -107,6 +109,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
       setDescription('');
       setCategory('');
       setDate(initialDate || getLocalDateString());
+      setPurchaseDate(initialDate || getLocalDateString());
       setStatus('pending');
       setInstallments('1');
       setTargetType('account');
@@ -149,6 +152,17 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
     }
   }, [type]);
 
+  // Auto-calculate due date for credit card transactions
+  useEffect(() => {
+    if (targetType === 'card' && purchaseDate && selectedId) {
+      const card = creditCards.find(c => c.id === selectedId);
+      if (card) {
+        const dueDate = calculateCreditCardDueDate(purchaseDate, card.closingDay, card.dueDay);
+        setDate(dueDate);
+      }
+    }
+  }, [targetType, purchaseDate, selectedId, creditCards]);
+
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -171,6 +185,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
       description,
       category: category || 'Outros',
       date,
+      purchaseDate: targetType === 'card' ? (purchaseDate || date) : undefined,
       status: targetType === 'card' ? 'pending' : status,
     }, finalInstallments, selectedId, targetType, isProjected ? recurrenceScope : undefined);
 
@@ -302,13 +317,35 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
               onChange={e => setDescription(e.target.value)}
               placeholder="Ex: Supermercado, Salário..."
             />
-            <Input
-              label="Data"
-              type="date"
-              required
-              value={date}
-              onChange={e => setDate(e.target.value)}
-            />
+            {targetType === 'card' ? (
+              <>
+                <Input
+                  label="Data da Compra"
+                  type="date"
+                  required
+                  value={purchaseDate}
+                  onChange={e => setPurchaseDate(e.target.value)}
+                />
+                <Input
+                  label="Vencimento da Fatura"
+                  type="date"
+                  required
+                  value={date}
+                  onChange={e => setDate(e.target.value)}
+                  disabled
+                  className="bg-slate-50"
+                  helperText="Calculado automaticamente"
+                />
+              </>
+            ) : (
+              <Input
+                label="Data"
+                type="date"
+                required
+                value={date}
+                onChange={e => setDate(e.target.value)}
+              />
+            )}
           </div>
 
           {/* Seletor de Destino */}

@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { TrendingUp, Wallet, Activity, Clock, Target, Flame, ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight, CheckCircle2, BarChart3, PiggyBank, Percent, TrendingDown } from 'lucide-react';
-import { DailyBalance, Account, UserSettings, Transaction } from '../types';
-import { formatCurrency, groupDataByCategory, groupDailyToMonthly, getLocalDateString } from '../utils/financeUtils';
+import { TrendingUp, Wallet, Activity, Clock, Target, Flame, ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight, CheckCircle2, BarChart3, PiggyBank, Percent, TrendingDown, CreditCard } from 'lucide-react';
+import { DailyBalance, Account, UserSettings, Transaction, CreditCard as CreditCardType } from '../types';
+import { formatCurrency, groupDataByCategory, groupDailyToMonthly, getLocalDateString, getCardInvoices } from '../utils/financeUtils';
 import { ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import Card, { CardHeader } from './ui/Card';
 
@@ -10,6 +10,7 @@ interface DashboardProps {
   accounts: Account[];
   settings: UserSettings;
   transactions: Transaction[];
+  creditCards: CreditCardType[];
 }
 
 const CHART_COLORS = [
@@ -27,7 +28,7 @@ const CHART_COLORS = [
   '#e11d48',
 ];
 
-const Dashboard: React.FC<DashboardProps> = ({ timeline, accounts, transactions }) => {
+const Dashboard: React.FC<DashboardProps> = ({ timeline, accounts, transactions, creditCards }) => {
   const [categoryMonth, setCategoryMonth] = useState(new Date());
   const [chartCursorKey, setChartCursorKey] = useState(() => {
     const d = new Date();
@@ -168,6 +169,114 @@ const Dashboard: React.FC<DashboardProps> = ({ timeline, accounts, transactions 
     });
     return combined;
   }, [transactions, timeline]);
+
+  const cardInvoices = useMemo(() => {
+    if (!creditCards || creditCards.length === 0) return [];
+    const txs = mergedTransactions.filter(t => t.cardId);
+    const invoices: Array<{ card: CreditCardType } & ReturnType<typeof getCardInvoices>[number]> = [];
+
+    creditCards.forEach(card => {
+      const cardTxs = txs.filter(t => t.cardId === card.id);
+      const invs = getCardInvoices(card, cardTxs);
+      invs.forEach(inv => invoices.push({ ...inv, card }));
+    });
+
+    return invoices.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  }, [creditCards, mergedTransactions]);
+
+  const formatShortDate = (dateStr: string | undefined) => {
+    if (!dateStr) return '—';
+    const [y, m, d] = dateStr.split('-');
+    return `${d}-${m}-${y.slice(-2)}`;
+  };
+
+  const cardSummaries = useMemo(() => {
+    if (!creditCards || creditCards.length === 0) return [];
+    return creditCards.map(card => {
+      const history = cardInvoices.filter(inv => inv.card.id === card.id);
+      if (history.length === 0) return null;
+      const upcoming = history.find(inv => inv.status !== 'closed' && inv.dueDate >= todayStr) ||
+        history.find(inv => inv.status !== 'closed') ||
+        history[history.length - 1];
+      if (!upcoming) return null;
+
+      const limitUsed = upcoming.amount;
+      const limitPct = card.limit ? (limitUsed / card.limit) * 100 : 0;
+
+      const futureInstallments = mergedTransactions.filter(t =>
+        t.cardId === card.id &&
+        t.installmentTotal && t.installmentCurrent &&
+        t.installmentCurrent < t.installmentTotal &&
+        t.date > upcoming.dueDate
+      ).reduce((sum, t) => sum + t.amount, 0);
+
+      const last3 = history.slice(-3);
+      const avg3 = last3.length ? last3.reduce((s, i) => s + i.amount, 0) / last3.length : null;
+      const deltaVsAvg = avg3 && avg3 > 0 ? ((upcoming.amount - avg3) / avg3) * 100 : null;
+
+      const dueDate = new Date(upcoming.dueDate + 'T00:00:00');
+      const now = new Date(todayStr + 'T00:00:00');
+      const daysToDue = Math.max(0, Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+
+      // Calcular dias decorridos baseado em purchaseDate real das transações
+      const invoiceTxs = mergedTransactions.filter(t =>
+        t.cardId === card.id &&
+        t.date === upcoming.dueDate
+      );
+
+      let daysElapsed = 1;
+      if (invoiceTxs.length > 0) {
+        // Pegar a compra mais antiga (menor purchaseDate)
+        const purchaseDates = invoiceTxs
+          .map(t => t.purchaseDate || t.date)
+          .filter(Boolean)
+          .sort();
+
+        if (purchaseDates.length > 0) {
+          const oldestPurchase = new Date(purchaseDates[0] + 'T00:00:00');
+          daysElapsed = Math.max(1, Math.ceil((now.getTime() - oldestPurchase.getTime()) / (1000 * 60 * 60 * 24)));
+        }
+      }
+
+      const dailyPace = limitUsed / daysElapsed;
+      const safeDaily = card.limit ? Math.max(0, (card.limit - limitUsed) / Math.max(1, daysToDue || 1)) : null;
+
+      const alert =
+        limitPct >= 90 ? 'Risco de estourar o limite neste ciclo' :
+        (deltaVsAvg !== null && deltaVsAvg > 20 ? 'Fatura acima da média dos últimos meses' :
+        (safeDaily !== null && dailyPace > safeDaily ? 'Ritmo de gastos acima do limite até o vencimento' : null));
+
+      return {
+        card,
+        invoice: upcoming,
+        limitUsed,
+        limitPct,
+        futureInstallments,
+        deltaVsAvg,
+        daysToDue,
+        dailyPace,
+        safeDaily,
+        alert,
+      };
+    }).filter(Boolean) as Array<{
+      card: CreditCardType;
+      invoice: ReturnType<typeof getCardInvoices>[number];
+      limitUsed: number;
+      limitPct: number;
+      futureInstallments: number;
+      deltaVsAvg: number | null;
+      daysToDue: number;
+      dailyPace: number;
+      safeDaily: number | null;
+      alert: string | null;
+    }>;
+  }, [cardInvoices, creditCards, mergedTransactions, todayStr]);
+
+  const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
+
+  const totalUpcomingAmount = useMemo(() => {
+    return cardSummaries.reduce((sum, c) => sum + c.invoice.amount, 0);
+  }, [cardSummaries]);
 
   const currentMonthExpenses = useMemo(() => {
     return mergedTransactions.filter(t => {
@@ -693,6 +802,121 @@ const Dashboard: React.FC<DashboardProps> = ({ timeline, accounts, transactions 
               </p>
             </div>
           </div>
+
+          {/* Cartões e Faturas - visão geral com expansão por cartão */}
+          {cardSummaries.length > 0 && (
+            <div className="relative overflow-hidden bg-white/95 backdrop-blur-sm rounded-2xl p-6 border border-indigo-600/20 shadow-[0_8px_30px_-8px_rgba(79,70,229,0.15)] transition-all duration-300 hover:shadow-[0_20px_50px_-12px_rgba(79,70,229,0.25)]">
+              <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/50 to-transparent pointer-events-none"></div>
+              <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+              <div className="relative z-10 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-indigo-100 rounded-xl shadow-sm">
+                      <CreditCard size={18} className="text-indigo-700"/>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700/70">Faturas de Cartão</span>
+                      <p className="text-xs text-slate-500">Visão geral e por cartão</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[11px] font-semibold text-slate-500">Total aberto</p>
+                    <p className="text-lg font-bold text-indigo-700">{formatCurrency(totalUpcomingAmount)}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  {cardSummaries.map(summary => (
+                    <div
+                      key={summary.card.id}
+                      className="p-3 rounded-xl border border-slate-100 bg-white/90 hover:border-indigo-100 transition-colors"
+                    >
+                      <button
+                        className="w-full flex items-center justify-between gap-3 text-left"
+                        onClick={() => setExpandedCardId(prev => prev === summary.card.id ? null : summary.card.id)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+                          <div>
+                            <p className="text-sm font-bold text-slate-800">{summary.card.name}</p>
+                            <p className="text-[11px] text-slate-500">
+                              Vence em {formatShortDate(summary.invoice.dueDate)} • {summary.daysToDue} dias • {summary.invoice.status === 'open' ? 'Aberta' : summary.invoice.status === 'future' ? 'Futura' : 'Fechada'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-bold text-slate-800">{formatCurrency(summary.invoice.amount)}</p>
+                          <p className={`text-[11px] font-semibold ${
+                            summary.limitPct >= 90 ? 'text-rose-600' :
+                            summary.limitPct >= 75 ? 'text-amber-600' :
+                            'text-emerald-600'
+                          }`}>{summary.limitPct.toFixed(0)}% do limite</p>
+                        </div>
+                      </button>
+
+                      {expandedCardId === summary.card.id && (
+                        <div className="mt-3 space-y-3 text-sm text-slate-700">
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between text-xs font-semibold text-slate-600">
+                              <span>Limite usado</span>
+                              <span>{formatCurrency(summary.limitUsed)} / {formatCurrency(summary.card.limit)}</span>
+                            </div>
+                            <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
+                              <div
+                                className={`h-2 rounded-full transition-all duration-500 ${
+                                  summary.limitPct >= 90 ? 'bg-rose-500' :
+                                  summary.limitPct >= 75 ? 'bg-amber-500' :
+                                  'bg-emerald-500'
+                                }`}
+                                style={{ width: `${Math.min(summary.limitPct, 110)}%` }}
+                              ></div>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                              <p className="text-[11px] uppercase font-bold text-slate-400 mb-1">Parcelado futuro</p>
+                              <p className="font-mono font-bold text-slate-800">{formatCurrency(summary.futureInstallments)}</p>
+                              <p className="text-[11px] text-slate-400">Impacto após esta fatura</p>
+                            </div>
+                            <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                              <p className="text-[11px] uppercase font-bold text-slate-400 mb-1">Variação vs 3m</p>
+                              <p className={`font-mono font-bold ${
+                                summary.deltaVsAvg === null ? 'text-slate-500' :
+                                summary.deltaVsAvg > 10 ? 'text-rose-600' :
+                                summary.deltaVsAvg < -5 ? 'text-emerald-600' : 'text-amber-600'
+                              }`}>
+                                {summary.deltaVsAvg === null ? 'Sem histórico' : `${summary.deltaVsAvg > 0 ? '+' : ''}${summary.deltaVsAvg.toFixed(1)}%`}
+                              </p>
+                              <p className="text-[11px] text-slate-400">Média últimas 3 faturas</p>
+                            </div>
+                          </div>
+
+                          <div className="p-3 rounded-xl bg-indigo-50 border border-indigo-100 text-sm text-indigo-900">
+                            <div className="flex items-center justify-between">
+                              <span className="font-semibold">Ritmo diário</span>
+                              {summary.safeDaily !== null && (
+                                <span className="text-[11px] font-semibold text-indigo-500">limite saudável: {formatCurrency(summary.safeDaily)}</span>
+                              )}
+                            </div>
+                            <p className="font-mono font-bold text-indigo-800">{formatCurrency(summary.dailyPace)}</p>
+                            <p className="text-[11px] text-indigo-700">Média estimada por dia até o vencimento</p>
+                          </div>
+
+                          {summary.alert && (
+                            <div className="flex items-start gap-2 p-3 rounded-xl bg-rose-50 border border-rose-100 text-sm text-rose-800">
+                              <span className="text-lg leading-none">⚠️</span>
+                              <span className="font-semibold">{summary.alert}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
