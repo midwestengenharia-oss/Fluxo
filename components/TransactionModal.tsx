@@ -92,10 +92,11 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
 
       if (transactionToEdit.cardId) {
         setTargetType('card');
-        setSelectedId(transactionToEdit.cardId);
+        setSelectedId(transactionToEdit.cardId || creditCards[0]?.id || '');
       } else {
         setTargetType('account');
-        setSelectedId(transactionToEdit.accountId || '');
+        const fallbackAcc = transactionToEdit.accountId || spendableAccounts[0]?.id || '';
+        setSelectedId(fallbackAcc);
       }
       if (transactionToEdit.id?.startsWith('proj-')) {
         setRecurrenceScope('single');
@@ -169,10 +170,13 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
     e.preventDefault();
 
     if (!selectedId) {
+      alert('Selecione um destino (conta ou cartão).');
       return;
     }
 
-    if (parseFloat(amount) <= 0) {
+    const numericAmount = parseFloat(amount);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      alert('Informe um valor maior que zero.');
       return;
     }
 
@@ -181,7 +185,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
     onSave({
       id: transactionToEdit?.id,
       type,
-      amount: parseFloat(amount),
+      amount: numericAmount,
       description,
       category: category || 'Outros',
       date,

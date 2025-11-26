@@ -19,13 +19,15 @@ interface AccountManagerProps {
   projectedTransactions?: Transaction[];
   onAddAccount: (account: Account) => void;
   onAddCard: (card: CreditCard) => void;
+  onUpdateAccount: (account: Account) => void;
+  onUpdateCard: (card: CreditCard) => void;
   onDeleteAccount: (id: string) => void;
   onDeleteCard: (id: string) => void;
 }
 
 const AccountManager: React.FC<AccountManagerProps> = ({
   accounts, creditCards, transactions, recurrences, projectedTransactions = [],
-  onAddAccount, onAddCard,
+  onAddAccount, onAddCard, onUpdateAccount, onUpdateCard,
   onDeleteAccount, onDeleteCard
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -37,14 +39,20 @@ const AccountManager: React.FC<AccountManagerProps> = ({
   const [viewAccount, setViewAccount] = useState<Account | null>(null);
 
   const handleSaveAccount = (acc: Account) => {
-    if (accountToEdit) onDeleteAccount(acc.id);
-    onAddAccount(acc);
+    if (accountToEdit) {
+      onUpdateAccount(acc);
+    } else {
+      onAddAccount(acc);
+    }
     setAccountToEdit(undefined);
   };
 
   const handleSaveCard = (card: CreditCard) => {
-    if (cardToEdit) onDeleteCard(card.id);
-    onAddCard(card);
+    if (cardToEdit) {
+      onUpdateCard(card);
+    } else {
+      onAddCard(card);
+    }
     setCardToEdit(undefined);
   };
 
@@ -64,10 +72,6 @@ const AccountManager: React.FC<AccountManagerProps> = ({
       t.date <= today
     );
 
-    console.log(`[DEBUG] Conta: ${account.name}`);
-    console.log(`[DEBUG] InitialBalance: ${account.initialBalance}`);
-    console.log(`[DEBUG] Total transações encontradas: ${accountTransactions.length}`);
-    console.log(`[DEBUG] Transações:`, accountTransactions);
 
     const transactionsTotal = accountTransactions.reduce((sum, t) => {
       if (t.type === 'income') return sum + t.amount;
@@ -75,8 +79,6 @@ const AccountManager: React.FC<AccountManagerProps> = ({
       return sum;
     }, 0);
 
-    console.log(`[DEBUG] Total de transações: ${transactionsTotal}`);
-    console.log(`[DEBUG] Saldo final: ${account.initialBalance + transactionsTotal}`);
 
     return account.initialBalance + transactionsTotal;
   };

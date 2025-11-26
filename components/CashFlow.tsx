@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { DailyBalance, Transaction, CreditCard, Account, HealthLevel } from '../types';
 import { formatCurrency, getLocalDateString } from '../utils/financeUtils';
+import { parseLocaleNumber, normalizeBoundary } from '../utils/numberUtils';
 import { ChevronLeft, ChevronRight, ArrowDownRight, ArrowUpRight, Wallet, Plus, Calendar, Sparkles, CreditCard as CreditCardIcon, Building2, ExternalLink, Clock, Check, TrendingUp, TrendingDown, Minus, AlertTriangle } from 'lucide-react';
 import Card from './ui/Card';
 import Button from './ui/Button';
@@ -57,36 +58,6 @@ const CashFlow: React.FC<CashFlowProps> = ({ timeline, creditCards, accounts, he
   const [currentDate, setCurrentDate] = useState(new Date());
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
 
-  const parseLocaleNumber = (value: any): number | null => {
-    if (value === null || value === undefined || value === '') return null;
-    if (typeof value === 'number' && Number.isFinite(value)) return value;
-    if (typeof value === 'string') {
-      const trimmed = value.trim();
-      if (trimmed === '') return null;
-
-      // Ex.: 10.000,50
-      const thousandPattern = /^\d{1,3}(\.\d{3})+(,\d+)?$/;
-      if (thousandPattern.test(trimmed)) {
-        const normalized = trimmed.replace(/\./g, '').replace(',', '.');
-        const num = Number(normalized);
-        return Number.isFinite(num) ? num : null;
-      }
-
-      // Ex.: 1000,5
-      const normalized = trimmed.replace(',', '.');
-      const num = Number(normalized);
-      return Number.isFinite(num) ? num : null;
-    }
-
-    const num = Number(value);
-    return Number.isFinite(num) ? num : null;
-  };
-
-  const normalizeBoundary = (value: any, fallback: number) => {
-    const parsed = parseLocaleNumber(value);
-    return parsed === null ? fallback : parsed;
-  };
-
   const getNormalizedLevels = () => {
     const normalized = healthLevels.map(level => ({
       ...level,
@@ -115,7 +86,6 @@ const CashFlow: React.FC<CashFlowProps> = ({ timeline, creditCards, accounts, he
       const withinRange = balanceNum >= level.min && balanceNum <= level.max;
       if (withinRange) {
         if (balanceNum === todayBalance) {
-          console.log('[health-debug] classificação', { balance: balanceNum, matched: level, levels: sorted });
         }
         return level;
       }
@@ -127,7 +97,6 @@ const CashFlow: React.FC<CashFlowProps> = ({ timeline, creditCards, accounts, he
       const curr = sorted[i];
       if (balanceNum > prev.max && balanceNum < curr.min) {
         const chosen = prev;
-        console.log('[health-debug] classificação (gap->prev)', { balance: balanceNum, levels: sorted, chosen });
         return chosen;
       }
     }
@@ -136,7 +105,6 @@ const CashFlow: React.FC<CashFlowProps> = ({ timeline, creditCards, accounts, he
     const lowest = sorted[0] || { id: 'fallback', label: 'N/A', color: 'slate', min: -Infinity, max: Infinity };
     const highest = sorted[sorted.length - 1] || lowest;
     const fallbackLevel = balanceNum < lowest.min ? lowest : highest;
-    console.log('[health-debug] classificação (fallback)', { balance: balanceNum, levels: sorted, chosen: fallbackLevel });
     return fallbackLevel;
   };
 
@@ -332,13 +300,8 @@ const CashFlow: React.FC<CashFlowProps> = ({ timeline, creditCards, accounts, he
   // DEBUG: loga configurações de saúde e classificação corrente
   useEffect(() => {
     const normalized = getNormalizedLevels();
-    console.log('[health-debug] níveis (raw)', healthLevels);
-    console.log('[health-debug] níveis (normalizados e ordenados)', normalized);
-    console.log('[health-debug] saldo hoje', todayBalance);
     if (todayBalance !== null) {
-      console.log('[health-debug] nível hoje', getHealthLevel(todayBalance));
     }
-    console.log('[health-debug] amostra healthBarData', healthBarData.slice(0, 5));
     if (typeof window !== 'undefined') {
       (window as any).__fluxoHealthDebug = {
         raw: healthLevels,

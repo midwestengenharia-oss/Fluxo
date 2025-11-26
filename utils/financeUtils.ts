@@ -151,7 +151,8 @@ export const calculateTimeline = (
   startDate: string,
   daysToProject: number = 365,
   healthLevels: HealthLevel[],
-  recurrenceOverrides: RecurrenceOverride[] = []
+  recurrenceOverrides: RecurrenceOverride[] = [],
+  maxHistoryDays: number = 120
 ): DailyBalance[] => {
   
   // Initial Balance considers only liquid assets (not investments/wallets) usually, 
@@ -172,12 +173,17 @@ export const calculateTimeline = (
       return min;
   }, null);
 
-  const effectiveStart = earliestTxDate && earliestTxDate < startCandidate ? earliestTxDate : startCandidate;
-  const extraDays = Math.max(0, Math.ceil((startCandidate.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24)));
-  const totalDays = daysToProject + extraDays;
+  const historyDays = earliestTxDate && earliestTxDate < startCandidate
+      ? Math.max(0, Math.ceil((startCandidate.getTime() - earliestTxDate.getTime()) / (1000 * 60 * 60 * 24)))
+      : 0;
+  const cappedHistoryDays = Math.min(historyDays, Math.max(0, maxHistoryDays));
+
+  const start = new Date(startCandidate);
+  start.setDate(start.getDate() - cappedHistoryDays);
+  const totalDays = daysToProject + cappedHistoryDays;
 
   // Apply historical transactions prior to the effective start so the running balance is real
-  const effectiveStartStr = effectiveStart.toISOString().split('T')[0];
+  const effectiveStartStr = start.toISOString().split('T')[0];
   const pastTransactions = manualTransactions.filter(t => t.date < effectiveStartStr);
   pastTransactions.forEach(t => {
       if (t.type === 'income') {
@@ -188,7 +194,6 @@ export const calculateTimeline = (
   });
   
   const timeline: DailyBalance[] = [];
-  const start = effectiveStart;
   const endDate = new Date(start);
   endDate.setDate(endDate.getDate() + totalDays);
 
@@ -247,8 +252,8 @@ export const calculateTimeline = (
       return next;
   };
 
-  // DEBUG helper: expõe overrides para inspeção no console
-  if (typeof window !== 'undefined') {
+  // DEBUG helper: expõe overrides para inspeção no console (somente em desenvolvimento)
+  if (typeof window !== 'undefined' && import.meta.env && import.meta.env.DEV) {
       (window as any).__fluxoOverrides = recurrenceOverrides;
   }
   
@@ -292,7 +297,6 @@ export const calculateTimeline = (
                   const override = getOverrideForDate(r.id, dateStr);
                   const finalTx = applyOverrideToProjection(baseTx, override);
                   if (finalTx && override && typeof window !== 'undefined') {
-                      console.log('[override-applied]', { recurrenceId: r.id, date: dateStr, override });
                   }
                   if (finalTx) {
                       projectedRecurrences.push(finalTx);
@@ -353,7 +357,6 @@ export const calculateTimeline = (
                       const override = getOverrideForDate(r.id, effectiveDateStr);
                       const finalTx = applyOverrideToProjection(baseTx, override);
                       if (finalTx && override && typeof window !== 'undefined') {
-                          console.log('[override-applied]', { recurrenceId: r.id, date: effectiveDateStr, override });
                       }
                       if (finalTx) {
                           projectedRecurrences.push(finalTx);

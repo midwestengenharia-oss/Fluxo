@@ -145,10 +145,12 @@ const RecurrenceModal: React.FC<RecurrenceModalProps> = ({
     e.preventDefault();
 
     if (!selectedTargetId) {
+      alert('Escolha uma conta ou cartão como destino da recorrência.');
       return;
     }
 
     if (parseFloat(amount) <= 0) {
+      alert('Informe um valor maior que zero.');
       return;
     }
 
