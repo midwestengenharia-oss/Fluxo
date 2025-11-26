@@ -229,9 +229,9 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
             <div className="flex gap-3">
               <Button variant="outline" onClick={onClose}>Cancelar</Button>
               <Button
-                variant={isSimulationMode ? 'secondary' : 'primary'}
+                variant="primary"
                 onClick={handleSubmit}
-                className={isSimulationMode ? 'bg-purple-600 hover:bg-purple-700' : ''}
+                className={isSimulationMode ? '!bg-purple-600 hover:!bg-purple-700 !text-white !border-purple-600 !shadow-purple-500/30' : ''}
               >
                 {transactionToEdit ? 'Salvar' : 'Adicionar'}
               </Button>
