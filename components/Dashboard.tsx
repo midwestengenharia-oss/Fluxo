@@ -300,7 +300,7 @@ const Dashboard: React.FC<DashboardProps> = ({ timeline, accounts, transactions 
           </div>
         </div>
 
-        {/* Patrimonio */}
+        {/* Patrimônio */}
         <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-900 rounded-2xl p-6 border border-white/10 shadow-[0_8px_30px_-8px_rgba(15,23,42,0.4)] transition-all duration-300 hover:shadow-[0_20px_50px_-12px_rgba(99,102,241,0.4)] hover:-translate-y-1">
           <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.03] pointer-events-none"></div>
           <div className="absolute -top-20 -right-20 w-40 h-40 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none"></div>
@@ -311,7 +311,7 @@ const Dashboard: React.FC<DashboardProps> = ({ timeline, accounts, transactions 
                 <Activity size={18} className="text-white" />
               </div>
               <div className="flex-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-white/70">Patrimonio</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-white/70">Patrimônio</span>
               </div>
             </div>
             <p className="text-3xl font-bold tracking-tight font-mono text-white mb-1">{formatCurrency(totalNetWorth)}</p>
@@ -319,7 +319,7 @@ const Dashboard: React.FC<DashboardProps> = ({ timeline, accounts, transactions 
           </div>
         </div>
 
-        {/* Projecao */}
+        {/* Projeção */}
         <div className={`relative overflow-hidden bg-white/95 backdrop-blur-sm rounded-2xl p-6 border transition-all duration-300 hover:shadow-[0_20px_50px_-12px_rgba(37,99,235,0.25)] hover:-translate-y-1 ${
           projectionDelta >= 0 ? 'border-emerald-600/20 shadow-[0_8px_30px_-8px_rgba(16,185,129,0.15)]' : 'border-rose-600/20 shadow-[0_8px_30px_-8px_rgba(244,63,94,0.15)]'
         }`}>
@@ -344,7 +344,7 @@ const Dashboard: React.FC<DashboardProps> = ({ timeline, accounts, transactions 
               <div className="flex-1">
                 <span className={`text-[10px] font-bold uppercase tracking-wider ${
                   projectionDelta >= 0 ? 'text-emerald-700/70' : 'text-rose-700/70'
-                }`}>Projecao 30d</span>
+                }`}>Projeção 30d</span>
               </div>
             </div>
             <p className={`text-3xl font-bold tracking-tight font-mono mb-1 ${
@@ -404,15 +404,15 @@ const Dashboard: React.FC<DashboardProps> = ({ timeline, accounts, transactions 
             <div className="relative z-10">
               <div className="flex justify-between items-start mb-6">
                 <div>
-                  <h3 className="text-xl font-bold text-slate-800 mb-1">Evolucao Mensal</h3>
-                  <p className="text-sm text-slate-500">Janela de 6 meses navegavel</p>
+                  <h3 className="text-xl font-bold text-slate-800 mb-1">Evolução Mensal</h3>
+                  <p className="text-sm text-slate-500">Janela de 6 meses navegável</p>
                 </div>
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2 text-xs font-bold text-slate-600">
                   <button
                     onClick={() => changeChartWindow(-1)}
                     className="p-1.5 rounded-md border border-slate-200 text-slate-500 hover:text-slate-700 hover:border-slate-300 transition-colors"
-                    aria-label="Retroceder um mes"
+                    aria-label="Retroceder um mês"
                   >
                     <ChevronLeft size={14} />
                   </button>
@@ -420,7 +420,7 @@ const Dashboard: React.FC<DashboardProps> = ({ timeline, accounts, transactions 
                   <button
                     onClick={() => changeChartWindow(1)}
                     className="p-1.5 rounded-md border border-slate-200 text-slate-500 hover:text-slate-700 hover:border-slate-300 transition-colors"
-                    aria-label="Avancar um mes"
+                    aria-label="Avançar um mês"
                   >
                     <ChevronRight size={14} />
                   </button>
@@ -432,7 +432,7 @@ const Dashboard: React.FC<DashboardProps> = ({ timeline, accounts, transactions 
                   </div>
                   <div className="flex items-center gap-1.5">
                     <div className="w-3 h-3 bg-rose-500 rounded-full shadow-sm"></div>
-                    <span className="text-slate-600">Saidas</span>
+                    <span className="text-slate-600">Saídas</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <div className="w-3 h-3 bg-indigo-600 rounded-full shadow-sm"></div>
@@ -505,7 +505,7 @@ const Dashboard: React.FC<DashboardProps> = ({ timeline, accounts, transactions 
               icon={<Target size={18} />}
               iconBg="bg-indigo-50 text-indigo-600"
               title="Categorias de Despesa"
-              subtitle="Ultimos meses"
+              subtitle="Últimos meses"
             />
             <div className="flex items-center justify-between mb-4">
               <p className="text-xs text-slate-500">
@@ -515,14 +515,14 @@ const Dashboard: React.FC<DashboardProps> = ({ timeline, accounts, transactions 
                 <button
                   onClick={() => changeCategoryMonth(-1)}
                   className="p-1.5 rounded-md border border-slate-200 text-slate-500 hover:text-slate-700 hover:border-slate-300 transition-colors"
-                  aria-label="Mes anterior"
+                  aria-label="Mês anterior"
                 >
                   <ChevronLeft size={14} />
                 </button>
                 <button
                   onClick={() => changeCategoryMonth(1)}
                   className="p-1.5 rounded-md border border-slate-200 text-slate-500 hover:text-slate-700 hover:border-slate-300 transition-colors"
-                  aria-label="Proximo mes"
+                  aria-label="Próximo mês"
                 >
                   <ChevronRight size={14} />
                 </button>
@@ -596,7 +596,7 @@ const Dashboard: React.FC<DashboardProps> = ({ timeline, accounts, transactions 
                     emergencyReserveStatus === 'safe' ? 'text-emerald-700/70' :
                     emergencyReserveStatus === 'warning' ? 'text-amber-700/70' :
                     'text-rose-700/70'
-                  }`}>Reserva Emergência</span>
+                  }`}>Reserva de Emergência</span>
                 </div>
               </div>
               <p className={`text-3xl font-bold tracking-tight font-mono mb-1 ${
@@ -624,7 +624,7 @@ const Dashboard: React.FC<DashboardProps> = ({ timeline, accounts, transactions 
                   <CheckCircle2 size={18} className="text-sky-700"/>
                 </div>
                 <div className="flex-1 flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-sky-700/70">Execução Orçamento</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-sky-700/70">Execução do Orçamento</span>
                   <span className="text-[11px] font-semibold text-slate-400">Dia {currentDay}/{daysInMonth}</span>
                 </div>
               </div>
