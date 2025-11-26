@@ -30,12 +30,7 @@ const CHART_COLORS = [
 
 const Dashboard: React.FC<DashboardProps> = ({ timeline, accounts, transactions, creditCards }) => {
   const [categoryMonth, setCategoryMonth] = useState(new Date());
-  const [chartCursorKey, setChartCursorKey] = useState(() => {
-    const d = new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    return `${y}-${m}`;
-  });
+  const [chartStartIndex, setChartStartIndex] = useState(0);
 
   const monthKeyFromDate = (d: Date) => {
     const y = d.getFullYear();
@@ -44,7 +39,6 @@ const Dashboard: React.FC<DashboardProps> = ({ timeline, accounts, transactions,
   };
 
   const categoryMonthKey = useMemo(() => monthKeyFromDate(categoryMonth), [categoryMonth]);
-  // chartCursorKey é uma string (YYYY-MM) para evitar problemas de timezone
 
   const categoryMonthLabel = useMemo(() => {
     return new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' })
@@ -61,12 +55,10 @@ const Dashboard: React.FC<DashboardProps> = ({ timeline, accounts, transactions,
     });
   };
   const changeChartWindow = (delta: number) => {
-    setChartCursorKey(prevKey => {
-      if (monthlyData.length === 0) return prevKey;
-      const currentIdx = monthlyData.findIndex(m => m.name === prevKey);
-      const safeIdx = currentIdx >= 0 ? currentIdx : 0;
-      const nextIdx = Math.min(Math.max(safeIdx + delta, 0), monthlyData.length - 1);
-      return monthlyData[nextIdx].name;
+    setChartStartIndex(prev => {
+      if (monthlyData.length === 0) return prev;
+      const maxStart = Math.max(monthlyData.length - 6, 0);
+      return Math.min(Math.max(prev + delta, 0), maxStart);
     });
   };
 
@@ -132,18 +124,10 @@ const Dashboard: React.FC<DashboardProps> = ({ timeline, accounts, transactions,
     return `${month} ${year}`;
   };
 
-  const chartIndex = useMemo(() => {
-    let idx = monthlyData.findIndex(m => m.name === chartCursorKey);
-    if (idx === -1) {
-      const greater = monthlyData.findIndex(m => m.name > chartCursorKey);
-      idx = greater === -1 ? monthlyData.length - 1 : greater;
-    }
-    return Math.max(0, idx);
-  }, [monthlyData, chartCursorKey]);
+  const maxStartIndex = Math.max(monthlyData.length - 6, 0);
+  const safeStartIndex = Math.min(Math.max(chartStartIndex, 0), maxStartIndex);
+  const monthlyChartData = monthlyData.slice(safeStartIndex, safeStartIndex + 6);
 
-  // Janela de 6 meses que desliza um a um; cursor aponta para o mês à direita da janela
-  const startIndex = Math.max(0, chartIndex - 5);
-  const monthlyChartData = monthlyData.slice(startIndex, startIndex + 6);
   const rangeLabel = monthlyChartData.length
     ? `${formatMonthKeyLabel(monthlyChartData[0].name)} - ${formatMonthKeyLabel(monthlyChartData[monthlyChartData.length - 1].name)}`
     : 'Sem dados';
