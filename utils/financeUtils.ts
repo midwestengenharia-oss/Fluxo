@@ -200,6 +200,14 @@ export const calculateTimeline = (
   const projectedRecurrences: Transaction[] = [];
   const makeUTCDate = (year: number, month: number, day: number) => new Date(Date.UTC(year, month, day));
 
+  // Helper para obter o último dia válido de um mês
+  const getValidDayOfMonth = (year: number, month: number, desiredDay: number): number => {
+    // Descobre quantos dias tem o mês
+    const lastDayOfMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+    // Retorna o menor valor entre o dia desejado e o último dia do mês
+    return Math.min(desiredDay, lastDayOfMonth);
+  };
+
   const byCreatedAt = (a: RecurrenceOverride, b: RecurrenceOverride) => {
       const ca = a.createdAt || '';
       const cb = b.createdAt || '';
@@ -309,10 +317,15 @@ export const calculateTimeline = (
       else {
           // Use UTC math to avoid timezone drift (e.g., day 15 caindo como 16)
           let base = recurrenceStart > start ? recurrenceStart : start;
-          let cursor = makeUTCDate(base.getUTCFullYear(), base.getUTCMonth(), r.dayOfMonth);
+
+          // Ajusta o dia para o último dia válido do mês se necessário (ex: dia 31 em fevereiro vira dia 28/29)
+          const validDay = getValidDayOfMonth(base.getUTCFullYear(), base.getUTCMonth(), r.dayOfMonth);
+          let cursor = makeUTCDate(base.getUTCFullYear(), base.getUTCMonth(), validDay);
+
           if (cursor < base) {
               cursor.setUTCMonth(cursor.getUTCMonth() + 1);
-              cursor = makeUTCDate(cursor.getUTCFullYear(), cursor.getUTCMonth(), r.dayOfMonth);
+              const nextValidDay = getValidDayOfMonth(cursor.getUTCFullYear(), cursor.getUTCMonth(), r.dayOfMonth);
+              cursor = makeUTCDate(cursor.getUTCFullYear(), cursor.getUTCMonth(), nextValidDay);
           }
 
           while (cursor < endDate) {
@@ -364,8 +377,13 @@ export const calculateTimeline = (
                   }
               }
               occurrences++;
-              cursor.setUTCMonth(cursor.getUTCMonth() + 1);
-              cursor = makeUTCDate(cursor.getUTCFullYear(), cursor.getUTCMonth(), r.dayOfMonth);
+              // Incrementa o mês e ajusta para o último dia válido
+              // Importante: criar nova data diretamente para evitar overflow do JavaScript
+              const nextMonth = cursor.getUTCMonth() + 1;
+              const nextYear = nextMonth > 11 ? cursor.getUTCFullYear() + 1 : cursor.getUTCFullYear();
+              const adjustedMonth = nextMonth > 11 ? 0 : nextMonth;
+              const nextValidDay = getValidDayOfMonth(nextYear, adjustedMonth, r.dayOfMonth);
+              cursor = makeUTCDate(nextYear, adjustedMonth, nextValidDay);
           }
       }
   });
